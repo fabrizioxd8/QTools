@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calendar, User, Folder, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getStatusBadgeClasses } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -57,6 +58,14 @@ export default function ActiveAssignments() {
       case 'lost': return XCircle;
     }
   };
+
+  const getConditionBadgeClass = (condition: 'good' | 'damaged' | 'lost') => {
+    switch (condition) {
+      case 'good': return getStatusBadgeClasses('Available');
+      case 'damaged': return getStatusBadgeClasses('Damaged');
+      case 'lost': return getStatusBadgeClasses('Lost');
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -116,17 +125,18 @@ export default function ActiveAssignments() {
             <div className="space-y-4">
               {activeAssignments.map(assignment => {
                 const daysOut = getDaysOut(assignment.checkoutDate);
+                const daysOut = getDaysOut(assignment.checkoutDate);
                 const isLongCheckout = daysOut > 7;
                 
                 return (
-                  <Card key={assignment.id} className={isLongCheckout ? 'border-warning' : ''}>
+                  <Card key={assignment.id} className={isLongCheckout ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800/20' : ''}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <Badge>Assignment #{assignment.id}</Badge>
                             {isLongCheckout && (
-                              <Badge variant="destructive">
+                              <Badge className={getStatusBadgeClasses('Cal. Due')}>
                                 <AlertCircle className="mr-1 h-3 w-3" />
                                 {daysOut} days out
                               </Badge>
@@ -262,11 +272,9 @@ export default function ActiveAssignments() {
                             {assignment.tools.map(tool => {
                               const condition = assignment.toolConditions?.[tool.id] || 'good';
                               const ConditionIcon = getConditionIcon(condition);
-                              let badgeVariant: 'default' | 'secondary' | 'destructive' = 'secondary';
-                              if (condition === 'damaged' || condition === 'lost') badgeVariant = 'destructive';
                               
                               return (
-                                <Badge key={tool.id} variant={badgeVariant}>
+                                <Badge key={tool.id} className={getConditionBadgeClass(condition)}>
                                   <ConditionIcon className="mr-1 h-3 w-3" />
                                   {tool.name} ({condition})
                                 </Badge>

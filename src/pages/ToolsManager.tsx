@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getStatusBadgeClasses } from '@/lib/utils';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -140,16 +141,6 @@ export default function ToolsManager() {
     setFormData({ ...formData, customAttributes: newAttrs });
   };
 
-  const getStatusBadgeVariant = (status: Tool['status']) => {
-    switch (status) {
-      case 'Available': return 'secondary';
-      case 'In Use': return 'default';
-      case 'Damaged':
-      case 'Lost': return 'destructive';
-      case 'Cal. Due': return 'secondary';
-      default: return 'default';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -236,7 +227,7 @@ export default function ToolsManager() {
                 <CardTitle className="text-lg">{tool.name}</CardTitle>
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline">{tool.category}</Badge>
-                  <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                  <Badge className={getStatusBadgeClasses(tool.status)}>{tool.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent>

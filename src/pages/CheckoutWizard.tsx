@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,11 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-interface CheckoutWizardProps {
-  onNavigate: (page: string) => void;
-}
-
-export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
+export default function CheckoutWizard() {
+  const navigate = useNavigate();
   const { tools, workers, projects, createAssignment } = useAppData();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTools, setSelectedTools] = useState<Tool[]>([]);
@@ -95,7 +93,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
       setSelectedProject(null);
       
       // Navigate to assignments
-      onNavigate('assignments');
+      navigate('/assignments');
     }
   };
 
