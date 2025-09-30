@@ -1,4 +1,30 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+
+// A custom hook to manage state with localStorage
+function useStickyState<T>(defaultValue: T, key: string): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const stickyValue = window.localStorage.getItem(key);
+      return stickyValue !== null
+        ? JSON.parse(stickyValue)
+        : defaultValue;
+    } catch (error) {
+      console.warn(`Error reading localStorage key “${key}”:`, error);
+      return defaultValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.warn(`Error setting localStorage key “${key}”:`, error);
+    }
+  }, [key, value]);
+
+  return [value, setValue];
+}
+
 
 export interface Tool {
   id: number;
@@ -128,10 +154,10 @@ const initialAssignments: Assignment[] = [
 ];
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [tools, setTools] = useState<Tool[]>(initialTools);
-  const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
+  const [tools, setTools] = useStickyState<Tool[]>(initialTools, 'qtools_tools');
+  const [workers, setWorkers] = useStickyState<Worker[]>(initialWorkers, 'qtools_workers');
+  const [projects, setProjects] = useStickyState<Project[]>(initialProjects, 'qtools_projects');
+  const [assignments, setAssignments] = useStickyState<Assignment[]>(initialAssignments, 'qtools_assignments');
 
   const addTool = (tool: Omit<Tool, 'id'>) => {
     const newTool = { ...tool, id: Math.max(0, ...tools.map(t => t.id)) + 1 };
@@ -139,9 +165,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateTool = (id: number, updatedTool: Partial<Tool>) => {
-    setTools(tools.map(tool => tool.id === id ? { ...tool, ...updatedTool } : tool));
+    setTools(prevTools => prevTools.map(tool => tool.id === id ? { ...tool, ...updatedTool } : tool));
     // Update tools in active assignments
-    setAssignments(assignments.map(assignment => ({
+    setAssignments(prevAssignments => prevAssignments.map(assignment => ({
       ...assignment,
       tools: assignment.tools.map(tool => 
         tool.id === id ? { ...tool, ...updatedTool } : tool
@@ -150,7 +176,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const deleteTool = (id: number) => {
-    setTools(tools.filter(tool => tool.id !== id));
+    setTools(prevTools => prevTools.filter(tool => tool.id !== id));
   };
 
   const addWorker = (worker: Omit<Worker, 'id'>) => {
@@ -159,11 +185,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateWorker = (id: number, updatedWorker: Partial<Worker>) => {
-    setWorkers(workers.map(worker => worker.id === id ? { ...worker, ...updatedWorker } : worker));
+    setWorkers(prevWorkers => prevWorkers.map(worker => worker.id === id ? { ...worker, ...updatedWorker } : worker));
   };
 
   const deleteWorker = (id: number) => {
-    setWorkers(workers.filter(worker => worker.id !== id));
+    setWorkers(prevWorkers => prevWorkers.filter(worker => worker.id !== id));
   };
 
   const addProject = (project: Omit<Project, 'id'>) => {
@@ -172,11 +198,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateProject = (id: number, updatedProject: Partial<Project>) => {
-    setProjects(projects.map(project => project.id === id ? { ...project, ...updatedProject } : project));
+    setProjects(prevProjects => prevProjects.map(project => project.id === id ? { ...project, ...updatedProject } : project));
   };
 
   const deleteProject = (id: number) => {
-    setProjects(projects.filter(project => project.id !== id));
+    setProjects(prevProjects => prevProjects.filter(project => project.id !== id));
   };
 
   const createAssignment = (assignment: Omit<Assignment, 'id' | 'status'>) => {
@@ -198,20 +224,29 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     checkinNotes?: string, 
     toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>
   ) => {
-    setAssignments(assignments.map(assignment => {
-      if (assignment.id === id) {
-        // Update tool statuses based on conditions
+    // This needs to be a functional update to get the latest tools state
+    setAssignments(prevAssignments => {
+      const newAssignments = [...prevAssignments];
+      const assignmentIndex = newAssignments.findIndex(a => a.id === id);
+
+      if (assignmentIndex > -1) {
+        const assignment = newAssignments[assignmentIndex];
+
+        // This is tricky because updateTool relies on the old state.
+        // A better approach would be to handle this in a more transactional way,
+        // but for now, we'll update the tools directly.
+        let toolsToUpdate = [...tools];
         assignment.tools.forEach(tool => {
           const condition = toolConditions?.[tool.id];
           let newStatus: Tool['status'] = 'Available';
           if (condition === 'damaged') newStatus = 'Damaged';
           else if (condition === 'lost') newStatus = 'Lost';
-          else if (condition === 'good') newStatus = 'Available';
           
-          updateTool(tool.id, { status: newStatus });
+          toolsToUpdate = toolsToUpdate.map(t => t.id === tool.id ? { ...t, status: newStatus } : t);
         });
+        setTools(toolsToUpdate);
 
-        return {
+        newAssignments[assignmentIndex] = {
           ...assignment,
           checkinDate: new Date().toISOString(),
           status: 'completed' as const,
@@ -219,8 +254,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
           toolConditions
         };
       }
-      return assignment;
-    }));
+      return newAssignments;
+    });
   };
 
   return (

@@ -7,7 +7,6 @@ import { useAppData } from '@/contexts/AppDataContext';
 import { Progress } from '@/components/ui/progress';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { getStatusBadgeClasses } from '@/lib/utils';
-import { getStatusBadgeClasses } from '@/lib/utils';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -197,17 +196,16 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {statusChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
                     data={statusChartData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
-                    cy="50%"
-                    outerRadius={80}
+                    cy="45%"
+                    outerRadius={70}
                     labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {statusChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name]} />
@@ -219,7 +217,12 @@ export default function Dashboard() {
                       border: "1px solid hsl(var(--border))",
                     }}
                   />
-                  <Legend />
+                  <Legend
+                    verticalAlign="bottom"
+                    wrapperStyle={{
+                      paddingTop: 20,
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (

@@ -125,7 +125,6 @@ export default function ActiveAssignments() {
             <div className="space-y-4">
               {activeAssignments.map(assignment => {
                 const daysOut = getDaysOut(assignment.checkoutDate);
-                const daysOut = getDaysOut(assignment.checkoutDate);
                 const isLongCheckout = daysOut > 7;
                 
                 return (
