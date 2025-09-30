@@ -121,6 +121,8 @@ export default function ToolsManager() {
     }
     
     setIsDialogOpen(false);
+    setNewAttrKey('');
+    setNewAttrValue('');
   };
 
   const handleDelete = (id: number) => {
