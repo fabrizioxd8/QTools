@@ -106,17 +106,17 @@ export default function ToolsManager() {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.name || !formData.category) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     if (editingTool) {
-      updateTool(editingTool.id, formData);
+      await updateTool(editingTool.id, formData);
       toast.success('Tool updated successfully');
     } else {
-      addTool(formData);
+      await addTool(formData);
       toast.success('Tool added successfully');
     }
     
@@ -125,8 +125,8 @@ export default function ToolsManager() {
     setNewAttrValue('');
   };
 
-  const handleDelete = (id: number) => {
-    deleteTool(id);
+  const handleDelete = async (id: number) => {
+    await deleteTool(id);
     toast.success('Tool deleted successfully');
     setDeleteConfirmId(null);
   };

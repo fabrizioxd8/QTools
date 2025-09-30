@@ -43,9 +43,9 @@ export default function ActiveAssignments() {
     setCheckinNotes('');
   };
 
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
     if (checkInDialog) {
-      checkInAssignment(checkInDialog.id, checkinNotes, toolConditions);
+      await checkInAssignment(checkInDialog.id, checkinNotes, toolConditions);
       toast.success('Tools checked in successfully!');
       setCheckInDialog(null);
     }

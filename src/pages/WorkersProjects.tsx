@@ -64,25 +64,25 @@ export default function WorkersProjects() {
     setIsWorkerDialogOpen(true);
   };
 
-  const handleWorkerSubmit = () => {
+  const handleWorkerSubmit = async () => {
     if (!workerFormData.name || !workerFormData.employeeId) {
       toast.error('Please fill in all fields');
       return;
     }
 
     if (editingWorker) {
-      updateWorker(editingWorker.id, workerFormData);
+      await updateWorker(editingWorker.id, workerFormData);
       toast.success('Worker updated successfully');
     } else {
-      addWorker(workerFormData);
+      await addWorker(workerFormData);
       toast.success('Worker added successfully');
     }
     
     setIsWorkerDialogOpen(false);
   };
 
-  const handleWorkerDelete = (id: number) => {
-    deleteWorker(id);
+  const handleWorkerDelete = async (id: number) => {
+    await deleteWorker(id);
     toast.success('Worker deleted successfully');
     setDeleteWorkerConfirm(null);
   };
@@ -99,25 +99,25 @@ export default function WorkersProjects() {
     setIsProjectDialogOpen(true);
   };
 
-  const handleProjectSubmit = () => {
+  const handleProjectSubmit = async () => {
     if (!projectFormData.name) {
       toast.error('Please enter a project name');
       return;
     }
 
     if (editingProject) {
-      updateProject(editingProject.id, projectFormData);
+      await updateProject(editingProject.id, projectFormData);
       toast.success('Project updated successfully');
     } else {
-      addProject(projectFormData);
+      await addProject(projectFormData);
       toast.success('Project added successfully');
     }
     
     setIsProjectDialogOpen(false);
   };
 
-  const handleProjectDelete = (id: number) => {
-    deleteProject(id);
+  const handleProjectDelete = async (id: number) => {
+    await deleteProject(id);
     toast.success('Project deleted successfully');
     setDeleteProjectConfirm(null);
   };
