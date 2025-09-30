@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -12,29 +12,9 @@ import WorkersProjects from '@/pages/WorkersProjects';
 import CheckoutWizard from '@/pages/CheckoutWizard';
 import ActiveAssignments from '@/pages/ActiveAssignments';
 import Reports from '@/pages/Reports';
+import NotFound from '@/pages/NotFound';
 
 const App = () => {
-  const [currentPage, setCurrentPage] = useState('dashboard');
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onNavigate={setCurrentPage} />;
-      case 'tools':
-        return <ToolsManager />;
-      case 'workers-projects':
-        return <WorkersProjects />;
-      case 'checkout':
-        return <CheckoutWizard onNavigate={setCurrentPage} />;
-      case 'assignments':
-        return <ActiveAssignments />;
-      case 'reports':
-        return <Reports />;
-      default:
-        return <Dashboard onNavigate={setCurrentPage} />;
-    }
-  };
-
   return (
     <AppDataProvider>
       <TooltipProvider>
@@ -42,7 +22,7 @@ const App = () => {
         <Sonner />
         <SidebarProvider>
           <div className="min-h-screen flex w-full">
-            <AppSidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+            <AppSidebar />
             
             <div className="flex-1 flex flex-col">
               {/* Mobile header with trigger */}
@@ -50,7 +30,9 @@ const App = () => {
                 <div className="flex h-14 items-center justify-between px-4">
                   <div className="flex items-center">
                     <SidebarTrigger />
-                    <h1 className="ml-4 text-lg font-semibold">QTools</h1>
+                    <Link to="/dashboard" className="flex items-center gap-2 ml-4">
+                      <img src="https://raw.githubusercontent.com/fabrizioxd8/QTools./main/logo.png" alt="QTools Logo" className="h-7 w-auto" />
+                    </Link>
                   </div>
                   <ThemeToggle />
                 </div>
@@ -59,7 +41,16 @@ const App = () => {
               {/* Main content */}
               <main className="flex-1 overflow-y-auto">
                 <div className="container mx-auto p-6">
-                  {renderPage()}
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/tools" element={<ToolsManager />} />
+                    <Route path="/workers-projects" element={<WorkersProjects />} />
+                    <Route path="/checkout" element={<CheckoutWizard />} />
+                    <Route path="/assignments" element={<ActiveAssignments />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
                 </div>
               </main>
             </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getStatusBadgeClasses } from '@/lib/utils';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,14 @@ export default function ToolsManager() {
   const [newAttrKey, setNewAttrKey] = useState('');
   const [newAttrValue, setNewAttrValue] = useState('');
   
+  const handleDialogChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setNewAttrKey('');
+      setNewAttrValue('');
+    }
+  };
+
   // Filters
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -112,6 +121,8 @@ export default function ToolsManager() {
     }
     
     setIsDialogOpen(false);
+    setNewAttrKey('');
+    setNewAttrValue('');
   };
 
   const handleDelete = (id: number) => {
@@ -140,16 +151,6 @@ export default function ToolsManager() {
     setFormData({ ...formData, customAttributes: newAttrs });
   };
 
-  const getStatusBadgeVariant = (status: Tool['status']) => {
-    switch (status) {
-      case 'Available': return 'secondary';
-      case 'In Use': return 'default';
-      case 'Damaged':
-      case 'Lost': return 'destructive';
-      case 'Cal. Due': return 'secondary';
-      default: return 'default';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -236,7 +237,7 @@ export default function ToolsManager() {
                 <CardTitle className="text-lg">{tool.name}</CardTitle>
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline">{tool.category}</Badge>
-                  <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                  <Badge className={getStatusBadgeClasses(tool.status)}>{tool.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
@@ -276,7 +277,7 @@ export default function ToolsManager() {
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingTool ? 'Edit Tool' : 'Add New Tool'}</DialogTitle>
@@ -391,7 +392,7 @@ export default function ToolsManager() {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => handleDialogChange(false)}>Cancel</Button>
             <Button onClick={handleSubmit}>
               {editingTool ? 'Update' : 'Add'} Tool
             </Button>
