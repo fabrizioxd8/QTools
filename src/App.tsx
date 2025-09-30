@@ -30,7 +30,9 @@ const App = () => {
                 <div className="flex h-14 items-center justify-between px-4">
                   <div className="flex items-center">
                     <SidebarTrigger />
-                    <h1 className="ml-4 text-lg font-semibold">QTools</h1>
+                    <Link to="/dashboard" className="flex items-center gap-2 ml-4">
+                      <img src="https://raw.githubusercontent.com/fabrizioxd8/QTools./main/logo.png" alt="QTools Logo" className="h-7 w-auto" />
+                    </Link>
                   </div>
                   <ThemeToggle />
                 </div>

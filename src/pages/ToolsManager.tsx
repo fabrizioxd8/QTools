@@ -392,7 +392,7 @@ export default function ToolsManager() {
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => handleDialogChange(false)}>Cancel</Button>
             <Button onClick={handleSubmit}>
               {editingTool ? 'Update' : 'Add'} Tool
             </Button>
