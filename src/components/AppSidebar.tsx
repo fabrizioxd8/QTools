@@ -1,3 +1,4 @@
+import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wrench, Users, ShoppingCart, ClipboardList, FileText } from 'lucide-react';
 import {
   Sidebar,
@@ -5,48 +6,45 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from '@/components/ui/sidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
-interface AppSidebarProps {
-  currentPage: string;
-  onNavigate: (page: string) => void;
-}
-
 const menuItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, page: 'dashboard' },
-  { title: 'Tools Manager', icon: Wrench, page: 'tools' },
-  { title: 'Workers & Projects', icon: Users, page: 'workers-projects' },
-  { title: 'Checkout', icon: ShoppingCart, page: 'checkout' },
-  { title: 'Active Assignments', icon: ClipboardList, page: 'assignments' },
-  { title: 'Reports', icon: FileText, page: 'reports' },
+  { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+  { title: 'Tools Manager', icon: Wrench, path: '/tools' },
+  { title: 'Workers & Projects', icon: Users, path: '/workers-projects' },
+  { title: 'Checkout', icon: ShoppingCart, path: '/checkout' },
+  { title: 'Active Assignments', icon: ClipboardList, path: '/assignments' },
+  { title: 'Reports', icon: FileText, path: '/reports' },
 ];
 
-export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
-  const { open } = useSidebar();
+export function AppSidebar() {
+  const location = useLocation();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="hidden lg:flex">
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>QTools</SidebarGroupLabel>
+          <Link to="/dashboard" className="flex items-center gap-2 px-3 py-4">
+            <img src="https://raw.githubusercontent.com/fabrizioxd8/QTools./main/logo.png" alt="QTools Logo" className="h-8 w-auto" />
+            <span className="text-lg font-semibold">QTools</span>
+          </Link>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.page}>
-                  <SidebarMenuButton
-                    onClick={() => onNavigate(item.page)}
-                    isActive={currentPage === item.page}
-                    tooltip={item.title}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
+                <SidebarMenuItem key={item.path}>
+                  <Link to={item.path}>
+                    <SidebarMenuButton
+                      isActive={location.pathname === item.path}
+                      tooltip={item.title}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </Link>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

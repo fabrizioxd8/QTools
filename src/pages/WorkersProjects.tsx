@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Pencil, Trash2, Search, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,7 @@ export default function WorkersProjects() {
   const [workerFormData, setWorkerFormData] = useState({ name: '', employeeId: '' });
   const [workerSearch, setWorkerSearch] = useState('');
   const [deleteWorkerConfirm, setDeleteWorkerConfirm] = useState<number | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Worker; direction: 'asc' | 'desc' } | null>({ key: 'name', direction: 'asc' });
   
   // Project state
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
@@ -121,10 +122,43 @@ export default function WorkersProjects() {
     setDeleteProjectConfirm(null);
   };
 
-  const filteredWorkers = workers.filter(w => 
-    w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
-    w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
-  );
+  const filteredWorkers = useMemo(() => {
+    let sortableWorkers = [...workers];
+    if (sortConfig !== null) {
+      sortableWorkers.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableWorkers.filter(w =>
+      w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
+      w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
+    );
+  }, [workers, workerSearch, sortConfig]);
+
+  const requestSort = (key: keyof Worker) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIndicator = (key: keyof Worker) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    }
+    return sortConfig.direction === 'asc' ? (
+      <ArrowUpDown className="ml-2 h-4 w-4" />
+    ) : (
+      <ArrowUpDown className="ml-2 h-4 w-4" /> // Icons can be swapped for up/down arrows
+    );
+  };
 
   const filteredProjects = projects.filter(p => 
     p.name.toLowerCase().includes(projectSearch.toLowerCase())
@@ -174,28 +208,40 @@ export default function WorkersProjects() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Employee ID</TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => requestSort('name')}>
+                          Name
+                          {getSortIndicator('name')}
+                        </Button>
+                      </TableHead>
+                      <TableHead>
+                        <Button variant="ghost" onClick={() => requestSort('employeeId')}>
+                          Employee ID
+                          {getSortIndicator('employeeId')}
+                        </Button>
+                      </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredWorkers.map(worker => (
-                      <TableRow key={worker.id} className="hover:bg-muted/50">
+                      <TableRow key={worker.id} className="even:bg-muted/50 hover:bg-muted">
                         <TableCell className="font-medium">{worker.name}</TableCell>
                         <TableCell>{worker.employeeId}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => openWorkerDialog(worker)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => setDeleteWorkerConfirm(worker.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -248,20 +294,22 @@ export default function WorkersProjects() {
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map(project => (
-                      <TableRow key={project.id} className="hover:bg-muted/50">
+                      <TableRow key={project.id} className="even:bg-muted/50 hover:bg-muted">
                         <TableCell className="font-medium">{project.name}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => openProjectDialog(project)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
+                              className="h-8 w-8"
                               onClick={() => setDeleteProjectConfirm(project.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />

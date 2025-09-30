@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { FileText, Download, Printer, Calendar } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileText, Download, Printer, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -125,12 +126,21 @@ export default function Reports() {
 
   const handlePrint = () => {
     window.print();
-    toast.success('Opening print dialog...');
   };
 
+  // Pagination for Activity Log
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const paginatedLog = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return activityLog.slice(start, end);
+  }, [activityLog, currentPage]);
+  const totalPages = Math.ceil(activityLog.length / itemsPerPage);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 print:space-y-4">
+      <div className="flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-3xl font-bold">Reports & Analytics</h1>
           <p className="text-muted-foreground">View activity logs and inventory status</p>
@@ -148,8 +158,12 @@ export default function Reports() {
         </div>
       </div>
 
+      <div className="print:hidden">
+        <h1 className="text-2xl font-bold hidden print:block mb-4">Tool Room Report</h1>
+      </div>
+
       {/* Date Range Selector */}
-      <Card>
+      <Card className="print:hidden">
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
             <Calendar className="h-5 w-5 text-muted-foreground" />
@@ -235,11 +249,17 @@ export default function Reports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activityLog.slice(0, 50).map((log, idx) => (
+                  {paginatedLog.map((log, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{new Date(log.date).toLocaleString()}</TableCell>
                       <TableCell>
-                        <Badge variant={log.action === 'Checkout' ? 'default' : 'secondary'}>
+                        <Badge
+                          className={
+                            log.action === 'Checkout'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-green-100 text-green-800'
+                          }
+                        >
                           {log.action}
                         </Badge>
                       </TableCell>
@@ -252,6 +272,31 @@ export default function Reports() {
               </Table>
             </div>
           )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-end space-x-2 pt-4 print:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -259,33 +304,41 @@ export default function Reports() {
       <Card>
         <CardHeader>
           <CardTitle>Tool Inventory Status</CardTitle>
-          <CardDescription>Breakdown by category</CardDescription>
+          <CardDescription>Breakdown by category with visual progress</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Available</TableHead>
-                <TableHead className="text-right">In Use</TableHead>
-                <TableHead className="text-right">Damaged</TableHead>
-                <TableHead className="text-right">Lost</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Object.entries(categoryBreakdown).map(([category, stats]) => (
-                <TableRow key={category}>
-                  <TableCell className="font-medium">{category}</TableCell>
-                  <TableCell className="text-right">{stats.available}</TableCell>
-                  <TableCell className="text-right">{stats.inUse}</TableCell>
-                  <TableCell className="text-right">{stats.damaged}</TableCell>
-                  <TableCell className="text-right">{stats.lost}</TableCell>
-                  <TableCell className="text-right font-semibold">{stats.total}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="space-y-4">
+            {Object.entries(categoryBreakdown).map(([category, stats]) => (
+              <div key={category}>
+                <h3 className="text-md font-medium mb-2">{category} ({stats.total} total)</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Available</span>
+                    <span className="text-sm font-medium">{stats.available}</span>
+                  </div>
+                  <Progress value={(stats.available / stats.total) * 100} className="h-2" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">In Use</span>
+                    <span className="text-sm font-medium">{stats.inUse}</span>
+                  </div>
+                  <Progress value={(stats.inUse / stats.total) * 100} className="h-2" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Damaged</span>
+                    <span className="text-sm font-medium">{stats.damaged}</span>
+                  </div>
+                  <Progress value={(stats.damaged / stats.total) * 100} className="h-2" />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Lost</span>
+                    <span className="text-sm font-medium">{stats.lost}</span>
+                  </div>
+                  <Progress value={(stats.lost / stats.total) * 100} className="h-2" />
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
