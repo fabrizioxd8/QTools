@@ -29,7 +29,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <Link to="/dashboard" className="flex items-center gap-2 px-3 py-4">
-            <img src="https://raw.githubusercontent.com/fabrizioxd8/QTools./main/logo.png" alt="QTools Logo" className="h-8 w-auto" />
+            <img src="/logo.png" alt="QTools Logo" className="h-8 w-auto" />
             <span className="text-lg font-semibold">QTools</span>
           </Link>
           <SidebarGroupContent>
