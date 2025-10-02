@@ -4,6 +4,9 @@ import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import https from 'https';
 import pem from 'pem';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 pem.createCertificate({ days: 365, selfSigned: true }, (err, keys) => {
     if (err) {
@@ -13,13 +16,33 @@ pem.createCertificate({ days: 365, selfSigned: true }, (err, keys) => {
     const app = express();
     const port = 3000;
 
-    const corsOptions = {
-        origin: ['http://localhost:8080', 'https://localhost:8080'],
-        optionsSuccessStatus: 200
-    };
-
-    app.use(cors(corsOptions));
+    app.use(cors());
     app.use(express.json());
+    app.use(express.static('public'));
+
+    // --- File Upload Setup ---
+    const uploadDir = 'public/uploads';
+    if (!fs.existsSync(uploadDir)){
+        fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const storage = multer.diskStorage({
+        destination: function (req, file, cb) {
+            cb(null, uploadDir)
+        },
+        filename: function (req, file, cb) {
+            cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname))
+        }
+    });
+
+    const upload = multer({ storage: storage });
+
+    app.post('/api/upload', upload.single('image'), (req, res) => {
+        if (!req.file) {
+            return res.status(400).send('No file uploaded.');
+        }
+        res.json({ filePath: `/uploads/${req.file.filename}` });
+    });
 
     let db;
 
@@ -275,7 +298,7 @@ pem.createCertificate({ days: 365, selfSigned: true }, (err, keys) => {
         cert: keys.certificate
     };
 
-    https.createServer(httpsOptions, app).listen(port, () => {
+    https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
         console.log(`Secure server is running on https://localhost:${port}`);
     });
 });

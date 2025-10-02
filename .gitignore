@@ -108,6 +108,7 @@ dist
 # Vite
 dist
 .vite/
+.env
 .env.local
 .env.*.local
 vite.config.ts.timestamp-*.mjs
