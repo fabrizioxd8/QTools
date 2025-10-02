@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:3000/api';
-
+const API_URL = import.meta.env.VITE_API_URL || `https://${window.location.hostname}:3000/api`;
 // Interfaces remain the same
 export interface Tool {
   id: number;

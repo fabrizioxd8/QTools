@@ -294,8 +294,8 @@ pem.createCertificate({ days: 365, selfSigned: true }, (err, keys) => {
     });
 
     const httpsOptions = {
-        key: keys.serviceKey,
-        cert: keys.certificate
+    key: fs.readFileSync('./localhost+3-key.pem'),
+    cert: fs.readFileSync('./localhost+3.pem')
     };
 
     https.createServer(httpsOptions, app).listen(port, '0.0.0.0', () => {
