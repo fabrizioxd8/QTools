@@ -192,9 +192,16 @@ export default function CheckoutWizard() {
                       >
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between">
-                            <div className="flex-1">
+                            <div className="flex-1 space-y-1">
                               <CardTitle className="text-base">{tool.name}</CardTitle>
-                              <Badge variant="outline" className="mt-1">{tool.category}</Badge>
+                              <Badge variant="outline">{tool.category}</Badge>
+                              <div className="text-xs text-muted-foreground pt-1">
+                                {Object.entries(tool.customAttributes).map(([key, value]) => (
+                                  <div key={key}>
+                                    <span className="font-semibold">{key}:</span> {value}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                             <Checkbox checked={isSelected} />
                           </div>
@@ -340,10 +347,15 @@ export default function CheckoutWizard() {
                 <h3 className="font-semibold mb-2">Selected Tools ({selectedTools.length})</h3>
                 <div className="space-y-2">
                   {selectedTools.map(tool => (
-                    <div key={tool.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div>
-                        <p className="font-medium">{tool.name}</p>
-                        <p className="text-sm text-muted-foreground">{tool.category}</p>
+                    <div key={tool.id} className="p-3 bg-muted rounded-lg">
+                      <p className="font-medium">{tool.name}</p>
+                      <p className="text-sm text-muted-foreground">{tool.category}</p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {Object.entries(tool.customAttributes).map(([key, value]) => (
+                          <span key={key} className="mr-2">
+                            <span className="font-semibold">{key}:</span> {value}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   ))}

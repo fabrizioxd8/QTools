@@ -39,8 +39,10 @@ import {
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools'];
 const statuses: Tool['status'][] = ['Available', 'In Use', 'Damaged', 'Lost', 'Cal. Due'];
 
+import { Folder } from 'lucide-react';
+
 export default function ToolsManager() {
-  const { tools, addTool, updateTool, deleteTool } = useAppData();
+  const { tools, assignments, addTool, updateTool, deleteTool } = useAppData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -78,6 +80,13 @@ export default function ToolsManager() {
     const matchesSearch = tool.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesStatus && matchesSearch;
   });
+
+  const findProjectForTool = (toolId: number) => {
+    const activeAssignment = assignments.find(a =>
+      a.status === 'active' && a.tools.some(t => t.id === toolId)
+    );
+    return activeAssignment ? activeAssignment.project : null;
+  };
 
   const openDialog = (tool?: Tool) => {
     if (tool) {
@@ -251,11 +260,21 @@ export default function ToolsManager() {
                   </div>
                 )}
                 
-                {tool.isCalibrable && tool.calibrationDue && (
-                  <p className="text-sm text-muted-foreground mb-4">
+                {tool.isCalibrable && tool.calibrationDue ? (
+                  <p className="text-sm text-muted-foreground mb-2">
                     <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
                   </p>
-                )}
+                ) : null}
+
+                {tool.status === 'In Use' && (() => {
+                  const project = findProjectForTool(tool.id);
+                  return project ? (
+                    <div className="text-sm text-muted-foreground mb-4 flex items-center gap-2 p-2 bg-muted rounded-md">
+                      <Folder className="h-4 w-4" />
+                      <span>Assigned to: <span className="font-medium">{project.name}</span></span>
+                    </div>
+                  ) : null;
+                })()}
                 
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => openDialog(tool)} className="flex-1">
@@ -330,7 +349,14 @@ export default function ToolsManager() {
               <Checkbox
                 id="calibrable"
                 checked={formData.isCalibrable}
-                onCheckedChange={(checked) => setFormData({ ...formData, isCalibrable: checked as boolean })}
+                onCheckedChange={(checked) => {
+                  const isChecked = checked as boolean;
+                  setFormData({
+                    ...formData,
+                    isCalibrable: isChecked,
+                    calibrationDue: isChecked ? formData.calibrationDue : ''
+                  });
+                }}
               />
               <Label htmlFor="calibrable" className="cursor-pointer">Is Calibrable?</Label>
             </div>
