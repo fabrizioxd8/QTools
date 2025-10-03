@@ -21,30 +21,33 @@ const menuItems = [
   { title: 'Reports', icon: FileText, path: '/reports' },
 ];
 
-export function AppSidebar() {
-  const location = useLocation();
+export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
+  const { setOpen } = useSidebar();
+
+  const handleNavigation = (page: string) => {
+    onNavigate(page);
+    setOpen(false);
+  };
 
   return (
-    <Sidebar collapsible="icon" className="hidden lg:flex">
+    <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <Link to="/dashboard" className="flex items-center gap-2 px-3 py-4">
+           <div className="flex items-center gap-2 px-3 py-4">
             <img src="/logo.png" alt="QTools Logo" className="h-8 w-auto" />
             <span className="text-lg font-semibold">QTools</span>
-          </Link>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
-                <SidebarMenuItem key={item.path}>
-                  <Link to={item.path}>
-                    <SidebarMenuButton
-                      isActive={location.pathname === item.path}
-                      tooltip={item.title}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                  </Link>
+                <SidebarMenuItem key={item.page}>
+                  <SidebarMenuButton
+                    onClick={() => handleNavigation(item.page)}
+                    isActive={currentPage === item.page}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
