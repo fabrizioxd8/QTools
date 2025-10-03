@@ -61,16 +61,11 @@ export default function ActiveAssignments() {
 
   const getConditionBadgeClass = (condition: 'good' | 'damaged' | 'lost') => {
     switch (condition) {
-      case 'good':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200/60 dark:border-green-700/40';
-      case 'damaged':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border-red-200/60 dark:border-red-700/40';
-      case 'lost':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200/60 dark:border-gray-700/40';
-      default:
-        return 'bg-secondary text-secondary-foreground';
+      case 'good': return getStatusBadgeClasses('Available');
+      case 'damaged': return getStatusBadgeClasses('Damaged');
+      case 'lost': return getStatusBadgeClasses('Lost');
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
