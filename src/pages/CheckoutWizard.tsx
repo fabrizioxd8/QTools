@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-interface CheckoutWizardProps {
-  onNavigate: (page: string) => void;
-}
-
-export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
+export default function CheckoutWizard() {
+  const navigate = useNavigate();
   const { tools, workers, projects, createAssignment } = useAppData();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTools, setSelectedTools] = useState<Tool[]>([]);
@@ -95,14 +93,14 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
       setSelectedProject(null);
       
       // Navigate to assignments
-      onNavigate('assignments');
+      navigate('/assignments');
     }
   };
 
   const progressPercentage = (currentStep / 4) * 100;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <div>
         <h1 className="text-3xl font-bold">Checkout Wizard</h1>
         <p className="text-muted-foreground">Follow the steps to checkout tools</p>
@@ -170,14 +168,6 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
                 />
               </div>
               
-              {selectedTools.length > 0 && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">
-                    Selected: {selectedTools.length} tool{selectedTools.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              )}
-              
               {filteredTools.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No available tools found</p>
               ) : (
@@ -194,9 +184,14 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
                       >
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between">
-                            <div className="flex-1">
+                            <div className="flex-1 space-y-2">
                               <CardTitle className="text-base">{tool.name}</CardTitle>
-                              <Badge variant="outline" className="mt-1">{tool.category}</Badge>
+                              <Badge variant="outline">{tool.category}</Badge>
+                              <div className="text-xs text-muted-foreground pt-1 space-x-2">
+                                {Object.entries(tool.customAttributes).map(([key, value]) => (
+                                  <Badge key={key} variant="secondary">{key}: {value}</Badge>
+                                ))}
+                              </div>
                             </div>
                             <Checkbox checked={isSelected} />
                           </div>
@@ -342,10 +337,13 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
                 <h3 className="font-semibold mb-2">Selected Tools ({selectedTools.length})</h3>
                 <div className="space-y-2">
                   {selectedTools.map(tool => (
-                    <div key={tool.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                      <div>
-                        <p className="font-medium">{tool.name}</p>
-                        <p className="text-sm text-muted-foreground">{tool.category}</p>
+                    <div key={tool.id} className="p-3 bg-muted rounded-lg">
+                      <p className="font-medium">{tool.name}</p>
+                      <p className="text-sm text-muted-foreground">{tool.category}</p>
+                      <div className="text-xs text-muted-foreground mt-1 space-x-2">
+                        {Object.entries(tool.customAttributes).map(([key, value]) => (
+                          <Badge key={key} variant="secondary" className="text-xs">{key}: {value}</Badge>
+                        ))}
                       </div>
                     </div>
                   ))}
@@ -393,26 +391,36 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={handlePrevious}
-          disabled={currentStep === 1}
-        >
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Previous
-        </Button>
-        
-        {currentStep < 4 ? (
-          <Button onClick={handleNext} disabled={!canProceed()}>
-            Next
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        ) : (
-          <Button onClick={handleComplete} disabled={!canProceed()}>
-            Complete Checkout
-          </Button>
-        )}
+      <div className="fixed bottom-0 left-0 lg:left-60 right-0 bg-background/80 backdrop-blur-sm border-t p-4">
+        <div className="container mx-auto flex justify-between items-center">
+           {currentStep === 1 && selectedTools.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <Wrench className="h-5 w-5 text-primary" />
+              <span className="font-bold">{selectedTools.length}</span> tool{selectedTools.length > 1 ? 's' : ''} selected
+            </div>
+          )}
+          {currentStep > 1 && (
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              disabled={currentStep === 1}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Previous
+            </Button>
+          )}
+          <div className="flex-grow"></div>
+          {currentStep < 4 ? (
+            <Button onClick={handleNext} disabled={!canProceed()}>
+              Next
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button onClick={handleComplete} disabled={!canProceed()}>
+              Complete Checkout
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -28,21 +28,28 @@ const menuItems = [
 ];
 
 export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
-  const { open } = useSidebar();
+  const { setOpen } = useSidebar();
+
+  const handleNavigation = (page: string) => {
+    onNavigate(page);
+    setOpen(false);
+  };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>QTools</SidebarGroupLabel>
+           <div className="flex items-center gap-2 px-3 py-4">
+            <img src="/logo.png" alt="QTools Logo" className="h-8 w-auto" />
+            <span className="text-lg font-semibold">QTools</span>
+          </div>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.page}>
                   <SidebarMenuButton
-                    onClick={() => onNavigate(item.page)}
+                    onClick={() => handleNavigation(item.page)}
                     isActive={currentPage === item.page}
-                    tooltip={item.title}
                   >
                     <item.icon className="h-5 w-5" />
                     <span>{item.title}</span>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 export interface Tool {
   id: number;
@@ -39,6 +39,7 @@ interface AppDataContextType {
   workers: Worker[];
   projects: Project[];
   assignments: Assignment[];
+  isLoading: boolean;
   addTool: (tool: Omit<Tool, 'id'>) => void;
   updateTool: (id: number, tool: Partial<Tool>) => void;
   deleteTool: (id: number) => void;
@@ -132,6 +133,15 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate initial data loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const addTool = (tool: Omit<Tool, 'id'>) => {
     const newTool = { ...tool, id: Math.max(0, ...tools.map(t => t.id)) + 1 };
@@ -230,6 +240,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         workers,
         projects,
         assignments,
+        isLoading,
         addTool,
         updateTool,
         deleteTool,

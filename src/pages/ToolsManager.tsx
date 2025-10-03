@@ -277,7 +277,10 @@ export default function ToolsManager() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>{editingTool ? 'Edit Tool' : 'Add New Tool'}</DialogTitle>
             <DialogDescription>
@@ -285,9 +288,10 @@ export default function ToolsManager() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Tool Name *</Label>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Tool Name *</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -345,16 +349,18 @@ export default function ToolsManager() {
               </div>
             )}
             
-            <div className="space-y-2">
-              <Label>Tool Image</Label>
-              <ImageUploadBox
-                value={formData.image}
-                onChange={(value) => setFormData({ ...formData, image: value })}
-              />
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Custom Attributes</Label>
+            <div className="space-y-4">
+               <div className="space-y-2">
+                <Label>Tool Image</Label>
+                <ImageUploadBox
+                  value={formData.image}
+                  onChange={(value) => setFormData({ ...formData, image: value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Custom Attributes</Label>
               <div className="space-y-2">
                 {Object.entries(formData.customAttributes).map(([key, value]) => (
                   <div key={key} className="flex gap-2 items-center">
@@ -390,6 +396,9 @@ export default function ToolsManager() {
             </div>
           </div>
           
+              </div>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSubmit}>

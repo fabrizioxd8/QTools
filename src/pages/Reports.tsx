@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FileText, Download, Printer, Calendar } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { FileText, Download, Printer, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,9 @@ import { toast } from 'sonner';
 export default function Reports() {
   const { tools, assignments } = useAppData();
   const [dateRange, setDateRange] = useState('30');
+  const [currentPage, setCurrentPage] = useState(1);
+  const activityLogRef = useRef<HTMLDivElement>(null);
+  const itemsPerPage = 10;
 
   // Calculate date range
   const today = new Date();
@@ -69,6 +72,19 @@ export default function Reports() {
   });
 
   activityLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const paginatedLog = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return activityLog.slice(start, end);
+  }, [activityLog, currentPage]);
+  const totalPages = Math.ceil(activityLog.length / itemsPerPage);
+
+  useEffect(() => {
+    if (currentPage > 1 && activityLogRef.current) {
+      activityLogRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [currentPage]);
 
   // Summary statistics
   const totalCheckouts = filteredAssignments.length;
@@ -213,10 +229,11 @@ export default function Reports() {
         </Card>
       </div>
 
-      {/* Activity Log */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity Log</CardTitle>
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* Activity Log */}
+        <Card ref={activityLogRef} className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>Activity Log</CardTitle>
           <CardDescription>Recent tool checkout and check-in activities</CardDescription>
         </CardHeader>
         <CardContent>
@@ -235,11 +252,17 @@ export default function Reports() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activityLog.slice(0, 50).map((log, idx) => (
+                  {paginatedLog.map((log, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{new Date(log.date).toLocaleString()}</TableCell>
                       <TableCell>
-                        <Badge variant={log.action === 'Checkout' ? 'default' : 'secondary'}>
+                         <Badge
+                          className={
+                            log.action === 'Checkout'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200/60'
+                              : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200/60'
+                          }
+                        >
                           {log.action}
                         </Badge>
                       </TableCell>
@@ -252,13 +275,38 @@ export default function Reports() {
               </Table>
             </div>
           )}
+           {totalPages > 1 && (
+            <div className="flex items-center justify-end space-x-2 pt-4 print:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Inventory Status by Category */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tool Inventory Status</CardTitle>
+        {/* Inventory Status by Category */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Tool Inventory Status</CardTitle>
           <CardDescription>Breakdown by category</CardDescription>
         </CardHeader>
         <CardContent>
@@ -266,28 +314,29 @@ export default function Reports() {
             <TableHeader>
               <TableRow>
                 <TableHead>Category</TableHead>
-                <TableHead className="text-right">Available</TableHead>
-                <TableHead className="text-right">In Use</TableHead>
-                <TableHead className="text-right">Damaged</TableHead>
-                <TableHead className="text-right">Lost</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right px-2">Avail</TableHead>
+                <TableHead className="text-right px-2">In Use</TableHead>
+                <TableHead className="text-right px-2">Dmg</TableHead>
+                <TableHead className="text-right px-2">Lost</TableHead>
+                <TableHead className="text-right px-2">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {Object.entries(categoryBreakdown).map(([category, stats]) => (
                 <TableRow key={category}>
-                  <TableCell className="font-medium">{category}</TableCell>
-                  <TableCell className="text-right">{stats.available}</TableCell>
-                  <TableCell className="text-right">{stats.inUse}</TableCell>
-                  <TableCell className="text-right">{stats.damaged}</TableCell>
-                  <TableCell className="text-right">{stats.lost}</TableCell>
-                  <TableCell className="text-right font-semibold">{stats.total}</TableCell>
+                  <TableCell className="font-medium px-2">{category}</TableCell>
+                  <TableCell className="text-right px-2">{stats.available}</TableCell>
+                  <TableCell className="text-right px-2">{stats.inUse}</TableCell>
+                  <TableCell className="text-right px-2">{stats.damaged}</TableCell>
+                  <TableCell className="text-right px-2">{stats.lost}</TableCell>
+                  <TableCell className="text-right px-2 font-semibold">{stats.total}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Pencil, Trash2, Search, ArrowUpDown, Folder, Wrench } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function WorkersProjects() {
-  const { workers, projects, addWorker, updateWorker, deleteWorker, addProject, updateProject, deleteProject } = useAppData();
+  const { workers, projects, assignments, addWorker, updateWorker, deleteWorker, addProject, updateProject, deleteProject } = useAppData();
   
   // Worker state
   const [isWorkerDialogOpen, setIsWorkerDialogOpen] = useState(false);
@@ -43,6 +43,7 @@ export default function WorkersProjects() {
   const [workerFormData, setWorkerFormData] = useState({ name: '', employeeId: '' });
   const [workerSearch, setWorkerSearch] = useState('');
   const [deleteWorkerConfirm, setDeleteWorkerConfirm] = useState<number | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'name', direction: 'asc' });
   
   // Project state
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
@@ -121,10 +122,66 @@ export default function WorkersProjects() {
     setDeleteProjectConfirm(null);
   };
 
-  const filteredWorkers = workers.filter(w => 
-    w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
-    w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
-  );
+  const workerStats = useMemo(() => {
+    const stats = new Map<number, { projectCount: number; toolCount: number }>();
+    const projectSet = new Map<number, Set<number>>();
+
+    assignments.forEach(assignment => {
+      if (assignment.status === 'active') {
+        const workerId = assignment.worker.id;
+
+        if (!projectSet.has(workerId)) {
+          projectSet.set(workerId, new Set());
+        }
+        projectSet.get(workerId)!.add(assignment.project.id);
+
+        const currentStats = stats.get(workerId) || { projectCount: 0, toolCount: 0 };
+        currentStats.toolCount += assignment.tools.length;
+        stats.set(workerId, currentStats);
+      }
+    });
+
+    projectSet.forEach((projects, workerId) => {
+        const currentStats = stats.get(workerId) || { projectCount: 0, toolCount: 0 };
+        currentStats.projectCount = projects.size;
+        stats.set(workerId, currentStats);
+    });
+
+    return stats;
+  }, [assignments]);
+
+  const sortedAndFilteredWorkers = useMemo(() => {
+    let sortableWorkers = workers.map(w => ({
+      ...w,
+      ...(workerStats.get(w.id) || { projectCount: 0, toolCount: 0 })
+    }));
+
+    if (sortConfig !== null) {
+      sortableWorkers.sort((a, b) => {
+        const key = sortConfig.key as keyof typeof a;
+        if (a[key] < b[key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[key] > b[key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return sortableWorkers.filter(w =>
+      w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
+      w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
+    );
+  }, [workers, workerSearch, sortConfig, workerStats]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const filteredProjects = projects.filter(p => 
     p.name.toLowerCase().includes(projectSearch.toLowerCase())
@@ -168,22 +225,40 @@ export default function WorkersProjects() {
                 </div>
               </div>
               
-              {filteredWorkers.length === 0 ? (
+              {sortedAndFilteredWorkers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No workers found</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => requestSort('name')}>
+                        <div className="flex items-center">Name <ArrowUpDown className="ml-2 h-4 w-4" /></div>
+                      </TableHead>
                       <TableHead>Employee ID</TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => requestSort('projectCount')}>
+                        <div className="flex items-center">Assigned Projects <ArrowUpDown className="ml-2 h-4 w-4" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => requestSort('toolCount')}>
+                        <div className="flex items-center">Assigned Tools <ArrowUpDown className="ml-2 h-4 w-4" /></div>
+                      </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredWorkers.map(worker => (
+                    {sortedAndFilteredWorkers.map(worker => (
                       <TableRow key={worker.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">{worker.name}</TableCell>
                         <TableCell>{worker.employeeId}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Folder className="h-4 w-4 text-muted-foreground" /> {worker.projectCount}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Wrench className="h-4 w-4 text-muted-foreground" /> {worker.toolCount}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
@@ -280,7 +355,7 @@ export default function WorkersProjects() {
 
       {/* Worker Dialog */}
       <Dialog open={isWorkerDialogOpen} onOpenChange={setIsWorkerDialogOpen}>
-        <DialogContent>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{editingWorker ? 'Edit Worker' : 'Add New Worker'}</DialogTitle>
             <DialogDescription>
@@ -319,7 +394,7 @@ export default function WorkersProjects() {
 
       {/* Project Dialog */}
       <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
-        <DialogContent>
+        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</DialogTitle>
             <DialogDescription>

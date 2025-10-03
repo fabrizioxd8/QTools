@@ -3,17 +3,18 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppDataProvider } from '@/contexts/AppDataContext';
+import { AppDataProvider, useAppData } from '@/contexts/AppDataContext';
 import { AppSidebar } from '@/components/AppSidebar';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import Dashboard from '@/pages/Dashboard';
 import ToolsManager from '@/pages/ToolsManager';
 import WorkersProjects from '@/pages/WorkersProjects';
 import CheckoutWizard from '@/pages/CheckoutWizard';
 import ActiveAssignments from '@/pages/ActiveAssignments';
 import Reports from '@/pages/Reports';
+import { Loader2 } from 'lucide-react';
 
-const App = () => {
+const AppContent = () => {
+  const { isLoading } = useAppData();
   const [currentPage, setCurrentPage] = useState('dashboard');
 
   const renderPage = () => {
@@ -35,35 +36,45 @@ const App = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex w-full">
+      <AppSidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <div className="flex-1 flex flex-col">
+        <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex h-14 items-center justify-between px-4">
+            <div className="lg:hidden">
+              <SidebarTrigger />
+            </div>
+            <div className="hidden lg:block" />
+            <div className="flex items-center gap-4" />
+          </div>
+        </header>
+        <main className="flex-1 overflow-y-auto">
+          <div className="container mx-auto p-6">
+            {renderPage()}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const App = () => {
   return (
     <AppDataProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
         <SidebarProvider>
-          <div className="min-h-screen flex w-full">
-            <AppSidebar currentPage={currentPage} onNavigate={setCurrentPage} />
-            
-            <div className="flex-1 flex flex-col">
-              {/* Mobile header with trigger */}
-              <header className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="flex h-14 items-center justify-between px-4">
-                  <div className="flex items-center">
-                    <SidebarTrigger />
-                    <h1 className="ml-4 text-lg font-semibold">QTools</h1>
-                  </div>
-                  <ThemeToggle />
-                </div>
-              </header>
-
-              {/* Main content */}
-              <main className="flex-1 overflow-y-auto">
-                <div className="container mx-auto p-6">
-                  {renderPage()}
-                </div>
-              </main>
-            </div>
-          </div>
+          <AppContent />
         </SidebarProvider>
       </TooltipProvider>
     </AppDataProvider>
