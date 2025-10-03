@@ -3,6 +3,7 @@ import { FileText, Download, Printer, Calendar, ChevronLeft, ChevronRight } from
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -141,12 +142,21 @@ export default function Reports() {
 
   const handlePrint = () => {
     window.print();
-    toast.success('Opening print dialog...');
   };
 
+  // Pagination for Activity Log
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const paginatedLog = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return activityLog.slice(start, end);
+  }, [activityLog, currentPage]);
+  const totalPages = Math.ceil(activityLog.length / itemsPerPage);
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 print:space-y-4">
+      <div className="flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-3xl font-bold">Reports & Analytics</h1>
           <p className="text-muted-foreground">View activity logs and inventory status</p>
@@ -164,8 +174,12 @@ export default function Reports() {
         </div>
       </div>
 
+      <div className="print:hidden">
+        <h1 className="text-2xl font-bold hidden print:block mb-4">Tool Room Report</h1>
+      </div>
+
       {/* Date Range Selector */}
-      <Card>
+      <Card className="print:hidden">
         <CardContent className="pt-6">
           <div className="flex items-center gap-4">
             <Calendar className="h-5 w-5 text-muted-foreground" />
