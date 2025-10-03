@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 
 const API_URL = import.meta.env.VITE_API_URL || `https://${window.location.hostname}:3000/api`;
 // Interfaces remain the same
@@ -31,68 +32,71 @@ interface AppDataContextType {
   projects: Project[];
   assignments: Assignment[];
   isLoading: boolean;
-  addTool: (tool: Omit<Tool, 'id'>) => void;
-  updateTool: (id: number, tool: Partial<Tool>) => void;
-  deleteTool: (id: number) => void;
-  addWorker: (worker: Omit<Worker, 'id'>) => void;
-  updateWorker: (id: number, worker: Partial<Worker>) => void;
-  deleteWorker: (id: number) => void;
-  addProject: (project: Omit<Project, 'id'>) => void;
-  updateProject: (id: number, project: Partial<Project>) => void;
-  deleteProject: (id: number) => void;
-  createAssignment: (assignment: Omit<Assignment, 'id' | 'status'>) => void;
-  checkInAssignment: (id: number, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>) => void;
+  addTool: (tool: Omit<Tool, 'id'>) => Promise<void>;
+  updateTool: (id: number, tool: Partial<Tool>) => Promise<void>;
+  deleteTool: (id: number) => Promise<void>;
+  addWorker: (worker: Omit<Worker, 'id'>) => Promise<void>;
+  updateWorker: (id: number, worker: Partial<Worker>) => Promise<void>;
+  deleteWorker: (id: number) => Promise<void>;
+  addProject: (project: Omit<Project, 'id'>) => Promise<void>;
+  updateProject: (id: number, project: Partial<Project>) => Promise<void>;
+  deleteProject: (id: number) => Promise<void>;
+  createAssignment: (assignment: Omit<Assignment, 'id' | 'status' | 'worker' | 'project'> & { workerId: number, projectId: number }) => Promise<void>;
+  checkInAssignment: (id: number, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>) => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [tools, setTools] = useState<Tool[]>(initialTools);
-  const [workers, setWorkers] = useState<Worker[]>(initialWorkers);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments);
-  const [isLoading, setIsLoading] = useState(true);
+    const [tools, setTools] = useState<Tool[]>([]);
+    const [workers, setWorkers] = useState<Worker[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [assignments, setAssignments] = useState<Assignment[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate initial data loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/data`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
 
-  const addTool = (tool: Omit<Tool, 'id'>) => {
-    const newTool = { ...tool, id: Math.max(0, ...tools.map(t => t.id)) + 1 };
-    setTools([...tools, newTool]);
-  };
+            // Parse customAttributes from JSON string
+            const parsedTools = data.tools.map((tool: any) => ({
+                ...tool,
+                customAttributes: typeof tool.customAttributes === 'string' ? JSON.parse(tool.customAttributes) : tool.customAttributes || {}
+            }));
 
-  const updateTool = (id: number, updatedTool: Partial<Tool>) => {
-    setTools(tools.map(tool => tool.id === id ? { ...tool, ...updatedTool } : tool));
-    // Update tools in active assignments
-    setAssignments(assignments.map(assignment => ({
-      ...assignment,
-      tools: assignment.tools.map(tool => 
-        tool.id === id ? { ...tool, ...updatedTool } : tool
-      )
-    })));
-  };
+            setTools(parsedTools);
+            setWorkers(data.workers);
+            setProjects(data.projects);
+            setAssignments(data.assignments);
+        } catch (error) {
+            toast.error("Failed to connect to the local server. Is it running?");
+            console.error("Failed to fetch data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-  const deleteTool = (id: number) => {
-    setTools(tools.filter(tool => tool.id !== id));
-  };
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
 
-  const addWorker = (worker: Omit<Worker, 'id'>) => {
-    const newWorker = { ...worker, id: Math.max(0, ...workers.map(w => w.id)) + 1 };
-    setWorkers([...workers, newWorker]);
-  };
-
-  const updateWorker = (id: number, updatedWorker: Partial<Worker>) => {
-    setWorkers(workers.map(worker => worker.id === id ? { ...worker, ...updatedWorker } : worker));
-  };
-
-  const deleteWorker = (id: number) => {
-    setWorkers(workers.filter(worker => worker.id !== id));
-  };
+    const apiRequest = async (url: string, method: string, body?: any) => {
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: body ? JSON.stringify(body) : undefined,
+            });
+            if (!response.ok) throw new Error('API request failed');
+            await fetchData(); // Refetch all data to stay in sync
+        } catch (error) {
+            toast.error(`API Error: ${error.message}`);
+            console.error("API Error:", error);
+        }
+    };
 
     // --- CRUD Functions ---
     const addTool = async (tool: Omit<Tool, 'id'>) => apiRequest(`${API_URL}/tools`, 'POST', tool);
@@ -115,30 +119,30 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         await apiRequest(`${API_URL}/assignments/${id}/checkin`, 'PUT', { checkinNotes, toolConditions });
     };
 
-  return (
-    <AppDataContext.Provider
-      value={{
-        tools,
-        workers,
-        projects,
-        assignments,
-        isLoading,
-        addTool,
-        updateTool,
-        deleteTool,
-        addWorker,
-        updateWorker,
-        deleteWorker,
-        addProject,
-        updateProject,
-        deleteProject,
-        createAssignment,
-        checkInAssignment,
-      }}
-    >
-      {children}
-    </AppDataContext.Provider>
-  );
+    return (
+        <AppDataContext.Provider
+            value={{
+                tools,
+                workers,
+                projects,
+                assignments,
+                isLoading,
+                addTool,
+                updateTool,
+                deleteTool,
+                addWorker,
+                updateWorker,
+                deleteWorker,
+                addProject,
+                updateProject,
+                deleteProject,
+                createAssignment,
+                checkInAssignment,
+            }}
+        >
+            {children}
+        </AppDataContext.Provider>
+    );
 };
 
 export const useAppData = () => {
