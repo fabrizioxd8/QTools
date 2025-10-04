@@ -1,4 +1,3 @@
-import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Wrench, Users, ShoppingCart, ClipboardList, FileText } from 'lucide-react';
 import {
   Sidebar,
@@ -6,19 +5,26 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
+interface AppSidebarProps {
+  currentPage: string;
+  onNavigate: (page: string) => void;
+}
+
 const menuItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-  { title: 'Tools Manager', icon: Wrench, path: '/tools' },
-  { title: 'Workers & Projects', icon: Users, path: '/workers-projects' },
-  { title: 'Checkout', icon: ShoppingCart, path: '/checkout' },
-  { title: 'Active Assignments', icon: ClipboardList, path: '/assignments' },
-  { title: 'Reports', icon: FileText, path: '/reports' },
+  { title: 'Dashboard', icon: LayoutDashboard, page: 'dashboard' },
+  { title: 'Tools Manager', icon: Wrench, page: 'tools' },
+  { title: 'Workers & Projects', icon: Users, page: 'workers-projects' },
+  { title: 'Checkout', icon: ShoppingCart, page: 'checkout' },
+  { title: 'Active Assignments', icon: ClipboardList, page: 'assignments' },
+  { title: 'Reports', icon: FileText, page: 'reports' },
 ];
 
 export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {

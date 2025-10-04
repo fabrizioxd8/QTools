@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { getStatusBadgeClasses } from '@/lib/utils';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,10 +38,8 @@ import {
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools'];
 const statuses: Tool['status'][] = ['Available', 'In Use', 'Damaged', 'Lost', 'Cal. Due'];
 
-import { Folder } from 'lucide-react';
-
 export default function ToolsManager() {
-  const { tools, assignments, addTool, updateTool, deleteTool } = useAppData();
+  const { tools, addTool, updateTool, deleteTool } = useAppData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -61,14 +58,6 @@ export default function ToolsManager() {
   const [newAttrKey, setNewAttrKey] = useState('');
   const [newAttrValue, setNewAttrValue] = useState('');
   
-  const handleDialogChange = (open: boolean) => {
-    setIsDialogOpen(open);
-    if (!open) {
-      setNewAttrKey('');
-      setNewAttrValue('');
-    }
-  };
-
   // Filters
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -80,13 +69,6 @@ export default function ToolsManager() {
     const matchesSearch = tool.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesStatus && matchesSearch;
   });
-
-  const findProjectForTool = (toolId: number) => {
-    const activeAssignment = assignments.find(a =>
-      a.status === 'active' && a.tools.some(t => t.id === toolId)
-    );
-    return activeAssignment ? activeAssignment.project : null;
-  };
 
   const openDialog = (tool?: Tool) => {
     if (tool) {
@@ -115,27 +97,25 @@ export default function ToolsManager() {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!formData.name || !formData.category) {
       toast.error('Please fill in all required fields');
       return;
     }
 
     if (editingTool) {
-      await updateTool(editingTool.id, formData);
+      updateTool(editingTool.id, formData);
       toast.success('Tool updated successfully');
     } else {
-      await addTool(formData);
+      addTool(formData);
       toast.success('Tool added successfully');
     }
     
     setIsDialogOpen(false);
-    setNewAttrKey('');
-    setNewAttrValue('');
   };
 
-  const handleDelete = async (id: number) => {
-    await deleteTool(id);
+  const handleDelete = (id: number) => {
+    deleteTool(id);
     toast.success('Tool deleted successfully');
     setDeleteConfirmId(null);
   };
@@ -160,6 +140,16 @@ export default function ToolsManager() {
     setFormData({ ...formData, customAttributes: newAttrs });
   };
 
+  const getStatusBadgeVariant = (status: Tool['status']) => {
+    switch (status) {
+      case 'Available': return 'secondary';
+      case 'In Use': return 'default';
+      case 'Damaged':
+      case 'Lost': return 'destructive';
+      case 'Cal. Due': return 'secondary';
+      default: return 'default';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -246,7 +236,7 @@ export default function ToolsManager() {
                 <CardTitle className="text-lg">{tool.name}</CardTitle>
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline">{tool.category}</Badge>
-                  <Badge className={getStatusBadgeClasses(tool.status)}>{tool.status}</Badge>
+                  <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent>
@@ -260,21 +250,11 @@ export default function ToolsManager() {
                   </div>
                 )}
                 
-                {tool.isCalibrable && tool.calibrationDue ? (
-                  <p className="text-sm text-muted-foreground mb-2">
+                {tool.isCalibrable && tool.calibrationDue && (
+                  <p className="text-sm text-muted-foreground mb-4">
                     <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
                   </p>
-                ) : null}
-
-                {tool.status === 'In Use' && (() => {
-                  const project = findProjectForTool(tool.id);
-                  return project ? (
-                    <div className="text-sm text-muted-foreground mb-4 flex items-center gap-2 p-2 bg-muted rounded-md">
-                      <Folder className="h-4 w-4" />
-                      <span>Assigned to: <span className="font-medium">{project.name}</span></span>
-                    </div>
-                  ) : null;
-                })()}
+                )}
                 
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => openDialog(tool)} className="flex-1">
@@ -353,14 +333,7 @@ export default function ToolsManager() {
               <Checkbox
                 id="calibrable"
                 checked={formData.isCalibrable}
-                onCheckedChange={(checked) => {
-                  const isChecked = checked as boolean;
-                  setFormData({
-                    ...formData,
-                    isCalibrable: isChecked,
-                    calibrationDue: isChecked ? formData.calibrationDue : ''
-                  });
-                }}
+                onCheckedChange={(checked) => setFormData({ ...formData, isCalibrable: checked as boolean })}
               />
               <Label htmlFor="calibrable" className="cursor-pointer">Is Calibrable?</Label>
             </div>
@@ -427,7 +400,7 @@ export default function ToolsManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => handleDialogChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSubmit}>
               {editingTool ? 'Update' : 'Add'} Tool
             </Button>

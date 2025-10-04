@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Calendar, User, Folder, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getStatusBadgeClasses } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,9 +42,9 @@ export default function ActiveAssignments() {
     setCheckinNotes('');
   };
 
-  const handleCheckIn = async () => {
+  const handleCheckIn = () => {
     if (checkInDialog) {
-      await checkInAssignment(checkInDialog.id, checkinNotes, toolConditions);
+      checkInAssignment(checkInDialog.id, checkinNotes, toolConditions);
       toast.success('Tools checked in successfully!');
       setCheckInDialog(null);
     }
@@ -133,14 +132,14 @@ export default function ActiveAssignments() {
                 const isLongCheckout = daysOut > 7;
                 
                 return (
-                  <Card key={assignment.id} className={isLongCheckout ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800/20' : ''}>
+                  <Card key={assignment.id} className={isLongCheckout ? 'border-warning' : ''}>
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <Badge>Assignment #{assignment.id}</Badge>
                             {isLongCheckout && (
-                              <Badge className={getStatusBadgeClasses('Cal. Due')}>
+                              <Badge variant="destructive">
                                 <AlertCircle className="mr-1 h-3 w-3" />
                                 {daysOut} days out
                               </Badge>
