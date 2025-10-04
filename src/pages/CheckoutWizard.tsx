@@ -75,12 +75,12 @@ export default function CheckoutWizard() {
     });
   };
 
-  const handleComplete = async () => {
+  const handleComplete = () => {
     if (selectedWorker && selectedProject && selectedTools.length > 0) {
-      await createAssignment({
+      createAssignment({
         checkoutDate: new Date().toISOString(),
-        workerId: selectedWorker.id,
-        projectId: selectedProject.id,
+        worker: selectedWorker,
+        project: selectedProject,
         tools: selectedTools,
       });
       

@@ -64,25 +64,25 @@ export default function WorkersProjects() {
     setIsWorkerDialogOpen(true);
   };
 
-  const handleWorkerSubmit = async () => {
+  const handleWorkerSubmit = () => {
     if (!workerFormData.name || !workerFormData.employeeId) {
       toast.error('Please fill in all fields');
       return;
     }
 
     if (editingWorker) {
-      await updateWorker(editingWorker.id, workerFormData);
+      updateWorker(editingWorker.id, workerFormData);
       toast.success('Worker updated successfully');
     } else {
-      await addWorker(workerFormData);
+      addWorker(workerFormData);
       toast.success('Worker added successfully');
     }
     
     setIsWorkerDialogOpen(false);
   };
 
-  const handleWorkerDelete = async (id: number) => {
-    await deleteWorker(id);
+  const handleWorkerDelete = (id: number) => {
+    deleteWorker(id);
     toast.success('Worker deleted successfully');
     setDeleteWorkerConfirm(null);
   };
@@ -99,25 +99,25 @@ export default function WorkersProjects() {
     setIsProjectDialogOpen(true);
   };
 
-  const handleProjectSubmit = async () => {
+  const handleProjectSubmit = () => {
     if (!projectFormData.name) {
       toast.error('Please enter a project name');
       return;
     }
 
     if (editingProject) {
-      await updateProject(editingProject.id, projectFormData);
+      updateProject(editingProject.id, projectFormData);
       toast.success('Project updated successfully');
     } else {
-      await addProject(projectFormData);
+      addProject(projectFormData);
       toast.success('Project added successfully');
     }
     
     setIsProjectDialogOpen(false);
   };
 
-  const handleProjectDelete = async (id: number) => {
-    await deleteProject(id);
+  const handleProjectDelete = (id: number) => {
+    deleteProject(id);
     toast.success('Project deleted successfully');
     setDeleteProjectConfirm(null);
   };
@@ -263,16 +263,14 @@ export default function WorkersProjects() {
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
+                              size="sm"
                               onClick={() => openWorkerDialog(worker)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
+                              size="sm"
                               onClick={() => setDeleteWorkerConfirm(worker.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -325,22 +323,20 @@ export default function WorkersProjects() {
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map(project => (
-                      <TableRow key={project.id} className="even:bg-muted/50 hover:bg-muted">
+                      <TableRow key={project.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">{project.name}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
+                              size="sm"
                               onClick={() => openProjectDialog(project)}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
+                              size="sm"
                               onClick={() => setDeleteProjectConfirm(project.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
