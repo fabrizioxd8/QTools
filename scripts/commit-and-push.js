@@ -23,20 +23,20 @@ try {
   console.log('   ✅ Executive summary & business docs');
   console.log('   ✅ Professional user guides');
   execSync('git add .', { stdio: 'pipe' });
-  
+
   console.log('\n💾 Creating epic commit...');
   execSync(`git commit -m "${shortMessage}"`, { stdio: 'inherit' });
-  
+
   console.log('\n🌐 Pushing to GitHub...');
   execSync('git push origin main', { stdio: 'inherit' });
-  
+
   console.log('\n🎉 SUCCESSFULLY PUSHED TO GITHUB!');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('🏆 ACHIEVEMENT UNLOCKED: Production-Ready Tool Inventory System');
   console.log('🔗 Check your repository for this epic transformation!');
   console.log('📱 Your QTools system is now ready for multi-device deployment');
   console.log('═══════════════════════════════════════════════════════════════');
-  
+
 } catch (error) {
   console.error('❌ Error during git operations:', error.message);
   console.log('\n💡 Manual steps:');
