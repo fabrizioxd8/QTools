@@ -13,7 +13,9 @@
     "setup-certs": "node scripts/setup-certs.js",
     "migrate": "node server/migrate.js",
     "start": "concurrently \"npm run server\" \"npm run dev\"",
-    "start:prod": "npm run build && concurrently \"npm run server\" \"npm run preview\""
+    "start:prod": "npm run build && concurrently \"npm run server\" \"npm run preview\"",
+    "commit": "node scripts/commit-and-push.js",
+    "pr": "node scripts/commit-and-pr.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
