@@ -1,17 +1,16 @@
-import { LayoutDashboard, Wrench, Users, ShoppingCart, ClipboardList, FileText } from 'lucide-react';
+import { LayoutDashboard, Wrench, Users, ShoppingCart, ClipboardList, FileText, X } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AppSidebarProps {
   currentPage: string;
@@ -28,43 +27,95 @@ const menuItems = [
 ];
 
 export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
-  const { setOpen } = useSidebar();
+  const { state, setOpen, setOpenMobile, isMobile } = useSidebar();
 
   const handleNavigation = (page: string) => {
     onNavigate(page);
-    setOpen(false);
+    
+    // Auto-collapse behavior based on screen size
+    if (isMobile) {
+      // On mobile: close the overlay sidebar
+      setOpenMobile(false);
+    } else {
+      // On desktop: collapse to icon-only if expanded
+      if (state === 'expanded') {
+        setOpen(false);
+      }
+    }
+  };
+
+  const handleCloseMobile = () => {
+    setOpenMobile(false);
   };
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarContent>
-        <SidebarGroup>
-           <div className="flex items-center gap-2 px-3 py-4">
-            <img src="/logo.png" alt="QTools Logo" className="h-8 w-auto" />
-            <span className="text-lg font-semibold">QTools</span>
+        {/* Mobile Close Button */}
+        {isMobile && (
+          <div className="flex justify-end p-2 lg:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCloseMobile}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close sidebar</span>
+            </Button>
           </div>
+        )}
+
+        <SidebarGroup>
+          {/* Logo Section - Always show logo icon, hide text when collapsed */}
+          <div className="flex items-center gap-2 px-3 py-4">
+            <img src="/logo.png" alt="QTools Logo" className="h-8 w-8 flex-shrink-0" />
+            <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
+              QTools
+            </span>
+          </div>
+
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.page}>
-                  <SidebarMenuButton
-                    onClick={() => handleNavigation(item.page)}
-                    isActive={currentPage === item.page}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.title}</span>
-                  </SidebarMenuButton>
+                  {/* Desktop: Show tooltip when collapsed */}
+                  {!isMobile && state === 'collapsed' ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton
+                          onClick={() => handleNavigation(item.page)}
+                          isActive={currentPage === item.page}
+                          className="w-full justify-center"
+                        >
+                          <item.icon className="h-5 w-5" />
+                          <span className="sr-only">{item.title}</span>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="font-medium">
+                        {item.title}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    /* Mobile or Desktop Expanded: Show full button */
+                    <SidebarMenuButton
+                      onClick={() => handleNavigation(item.page)}
+                      isActive={currentPage === item.page}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span className="group-data-[collapsible=icon]:hidden">
+                        {item.title}
+                      </span>
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <div className="flex items-center justify-center p-2">
-          <ThemeToggle />
-        </div>
-      </SidebarFooter>
+
+      {/* Remove SidebarFooter - theme toggle moved to top bar */}
     </Sidebar>
   );
 }
