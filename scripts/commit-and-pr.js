@@ -5,18 +5,6 @@ import readline from 'readline';
 
 // Function to generate intelligent commit message based on changes
 function generateCommitMessage(changedFiles) {
-  const categories = {
-    '🔧': ['server/', 'database.js', 'api.ts', '.env'],
-    '🎨': ['components/', 'pages/', '.tsx', '.css', 'ui/'],
-    '📝': ['.md', 'README', 'GUIDE', 'SUMMARY'],
-    '⚙️': ['package.json', 'vite.config', 'tsconfig', '.json'],
-    '🔒': ['certs/', 'ssl', 'https', 'security'],
-    '🐛': ['fix', 'bug', 'error', 'issue'],
-    '✨': ['feature', 'new', 'add'],
-    '📱': ['mobile', 'responsive', 'device'],
-    '🚀': ['deploy', 'build', 'production']
-  };
-
   const fileTypes = {
     backend: ['server/', 'database.js', 'api.ts', 'routes/'],
     frontend: ['src/', 'components/', 'pages/', '.tsx'],
@@ -85,7 +73,17 @@ function askUser(question) {
   });
 }
 
-console.log('🚀 QTools - Smart Commit & Pull Request');
+// Check if GitHub CLI is available
+function hasGitHubCLI() {
+  try {
+    execSync('gh --version', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+console.log('🚀 QTools - Smart Commit & Auto Pull Request');
 console.log('═══════════════════════════════════════════════════════════════\n');
 
 try {
@@ -128,14 +126,15 @@ try {
   }
 
   // Generate branch name from commit message
+  const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
   const branchName = `feature/${finalMessage
     .toLowerCase()
     .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
     .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .substring(0, 50)}`; // Limit length
+    .substring(0, 30)}-${timestamp}`; // Add timestamp and limit length
 
   console.log(`\n🌿 Creating new branch: "${branchName}"`);
-
+  
   // Create and switch to new branch
   execSync(`git checkout -b "${branchName}"`, { stdio: 'pipe' });
 
@@ -148,15 +147,41 @@ try {
   console.log(`\n🌐 Pushing branch to GitHub...`);
   execSync(`git push -u origin "${branchName}"`, { stdio: 'inherit' });
 
-  console.log('\n🎉 SUCCESSFULLY PUSHED BRANCH TO GITHUB!');
-  console.log('═══════════════════════════════════════════════════════════════');
-  console.log(`🌿 Branch: ${branchName}`);
-  console.log('🔗 Next steps:');
-  console.log('   1. Go to your GitHub repository');
-  console.log('   2. Create a Pull Request from the new branch');
-  console.log('   3. Review and merge when ready');
-  console.log('═══════════════════════════════════════════════════════════════');
+  // Check if GitHub CLI is available and ask user if they want to create PR
+  const hasGH = hasGitHubCLI();
+  
+  if (hasGH) {
+    const createPR = await askUser('\n🔄 Create Pull Request automatically? (y/n): ');
+    
+    if (createPR.toLowerCase() === 'y' || createPR.toLowerCase() === 'yes') {
+      console.log('\n📝 Creating Pull Request...');
+      
+      const prTitle = finalMessage;
+      const prBody = `## Changes\n\n${changedFiles.map(f => `- ${f}`).join('\n')}\n\n## Description\n\nAutomatically generated pull request for: ${finalMessage}`;
+      
+      try {
+        const prResult = execSync(`gh pr create --title "${prTitle}" --body "${prBody}" --base main --head "${branchName}"`, { encoding: 'utf8' });
+        console.log('\n🎉 PULL REQUEST CREATED SUCCESSFULLY!');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log(`🔗 ${prResult.trim()}`);
+        console.log('═══════════════════════════════════════════════════════════════');
+      } catch (error) {
+        console.log('\n⚠️  Could not create PR automatically. You can create it manually on GitHub.');
+      }
+    }
+  }
 
+  if (!hasGH || createPR?.toLowerCase() !== 'y') {
+    console.log('\n🎉 SUCCESSFULLY PUSHED BRANCH TO GITHUB!');
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log(`🌿 Branch: ${branchName}`);
+    console.log('🔗 Next steps:');
+    console.log('   1. Go to your GitHub repository');
+    console.log('   2. Create a Pull Request from the new branch');
+    console.log('   3. Review and merge when ready');
+    console.log('═══════════════════════════════════════════════════════════════');
+  }
+  
   // Switch back to main branch
   console.log('\n🔄 Switching back to main branch...');
   execSync('git checkout main', { stdio: 'pipe' });
@@ -164,7 +189,9 @@ try {
 } catch (error) {
   console.error('❌ Error during git operations:', error.message);
   console.log('\n💡 You can try manually:');
-  console.log('1. git add .');
-  console.log('2. git commit -m "Your message here"');
-  console.log('3. git push origin main');
+  console.log('1. git checkout -b feature/your-branch-name');
+  console.log('2. git add .');
+  console.log('3. git commit -m "Your message here"');
+  console.log('4. git push -u origin feature/your-branch-name');
+  console.log('5. Create PR on GitHub');
 }
