@@ -11,7 +11,7 @@ console.log('   Basic UI → Professional Enterprise-Grade Interface');
 console.log('   Technical Docs → Complete Business Presentation Suite');
 console.log('═══════════════════════════════════════════════════════════════\n');
 
-const shortMessage = '🚀 Complete QTools Backend Integration, UI Overhaul & Professional Documentation Suite';
+const shortMessage = '🧪 Test: Verify automated commit script works after ES module fix';
 
 try {
   console.log('📋 Staging all changes...');
