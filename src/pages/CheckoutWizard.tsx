@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder, Wrench } from 'lucide-react';
+import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,13 +11,13 @@ import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-
 interface CheckoutWizardProps {
-  onNavigate: (page: string) => void;
+  onNavigate?: (page: string) => void;
 }
 
-export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
-  const { tools, workers, projects, createAssignment } = useAppData();
+export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {}) {
+  const { tools, workers, projects, createAssignment, isLoading } = useAppData();
+  const { state, isMobile } = useSidebar();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTools, setSelectedTools] = useState<Tool[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
@@ -96,7 +97,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
         setSelectedProject(null);
 
         // Navigate to assignments
-        onNavigate('assignments');
+        onNavigate?.('assignments');
       } catch (error) {
         toast.error('Failed to complete checkout. Please try again.');
         console.error('Error creating assignment:', error);
@@ -106,8 +107,30 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
 
   const progressPercentage = (currentStep / 4) * 100;
 
+  // Show loading state only briefly, then show content regardless
+  const [showLoading, setShowLoading] = useState(true);
+
+  React.useEffect(() => {
+    const timeout = setTimeout(() => {
+      setShowLoading(false);
+    }, 3000); // Show loading for max 3 seconds
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  if (isLoading && showLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading checkout wizard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6 pb-20">
       <div>
         <h1 className="text-3xl font-bold">Checkout Wizard</h1>
         <p className="text-muted-foreground">Follow the steps to checkout tools</p>
@@ -392,8 +415,18 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
       )}
 
       {/* Navigation */}
-      <div className="fixed bottom-0 left-0 lg:left-60 right-0 bg-background/80 backdrop-blur-sm border-t p-4">
-        <div className="container mx-auto flex justify-between items-center">
+      <div
+        className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t shadow-2xl p-4 transition-all duration-200 ease-in-out ${isMobile
+            ? 'left-0'
+            : state === 'collapsed'
+              ? 'left-16'
+              : 'left-60'
+          }`}
+        style={{
+          boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)'
+        }}
+      >
+        <div className="max-w-7xl mx-auto flex justify-between items-center px-2">
           {currentStep === 1 && selectedTools.length > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <Wrench className="h-5 w-5 text-primary" />

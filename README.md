@@ -34,13 +34,16 @@ QTools is a **production-ready tool inventory management system** designed to el
 
 ### 🔧 **Complete Tool Management**
 - Digital tool catalog with photos and specifications
+- **Flexible View Options:** Switch between grid and list views with customizable column density (2, 3, or 4 columns)
+- **Advanced Sorting:** Click table headers to sort by name, category, or status with visual feedback
 - Custom attributes for detailed tracking (serial numbers, purchase dates, etc.)
 - Status tracking (Available, In Use, Damaged, Lost, Calibration Due)
 - Maintenance and calibration scheduling
 
 ### 👥 **Workforce & Project Integration**
-- Worker profiles with assignment history
-- Project-based tool allocation
+- Worker profiles with assignment history and generic user icons for visual consistency
+- Project-based tool allocation with folder icons for easy identification
+- **Intuitive Table Sorting:** Click column headers to sort workers and projects
 - Performance tracking and accountability
 - Workload distribution analysis
 

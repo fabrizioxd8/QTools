@@ -31,6 +31,25 @@ QTools helps you **track tools, prevent loss, and stay organized**. Think of it 
 
 ---
 
+## ✨ New Features
+
+### **Flexible Tool Views**
+- **Grid View**: See tools as cards with images (choose 2, 3, or 4 columns)
+- **List View**: See tools in a detailed table format
+- Switch views using the buttons at the top of the Tools Manager
+
+### **Smart Sorting**
+- **Tools Page**: Use the sort buttons to organize by Name, Category, or Status
+- **Workers & Projects**: Click column headers to sort tables
+- **Visual Feedback**: Icons show if data is sorted ascending (▲), descending (▼), or unsorted (↕️)
+
+### **Improved Interface**
+- **Generic Icons**: Workers have user icons, projects have folder icons for easy recognition
+- **Better Navigation**: Checkout wizard flows more smoothly
+- **Enhanced Mobile**: Better experience on phones and tablets
+
+---
+
 ## 🚀 Getting Started
 
 ### **Accessing QTools**
