@@ -68,7 +68,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     const loadData = async () => {
       try {
         setIsLoading(true);
-        
+
         // Load all data in parallel
         const [toolsData, workersData, projectsData, assignmentsData] = await Promise.all([
           apiClient.getTools(),
@@ -83,7 +83,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         setAssignments(assignmentsData);
       } catch (error) {
         console.error('Failed to load initial data:', error);
-        // You might want to show a toast notification here
+        // Set empty arrays so the app doesn't stay in loading state
+        setTools([]);
+        setWorkers([]);
+        setProjects([]);
+        setAssignments([]);
       } finally {
         setIsLoading(false);
       }
@@ -106,11 +110,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       const updated = await apiClient.updateTool(id, updatedTool);
       setTools(tools.map(tool => tool.id === id ? updated : tool));
-      
+
       // Update tools in active assignments
       setAssignments(assignments.map(assignment => ({
         ...assignment,
-        tools: assignment.tools.map(tool => 
+        tools: assignment.tools.map(tool =>
           tool.id === id ? { ...tool, ...updatedTool } : tool
         )
       })));
@@ -199,10 +203,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         projectId: assignment.project.id,
         toolIds
       };
-      
+
       const newAssignment = await apiClient.createAssignment(assignmentData);
       setAssignments([...assignments, newAssignment]);
-      
+
       // Refresh tools to get updated statuses
       const updatedTools = await apiClient.getTools();
       setTools(updatedTools);
@@ -222,11 +226,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         checkinNotes,
         toolConditions
       });
-      
-      setAssignments(assignments.map(assignment => 
+
+      setAssignments(assignments.map(assignment =>
         assignment.id === id ? updatedAssignment : assignment
       ));
-      
+
       // Refresh tools to get updated statuses
       const updatedTools = await apiClient.getTools();
       setTools(updatedTools);

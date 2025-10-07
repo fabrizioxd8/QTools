@@ -102,7 +102,7 @@ export default function ActiveAssignments() {
                 <div className="text-2xl font-bold text-primary">{activeAssignments.length}</div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium">Tools Checked Out</CardTitle>
@@ -113,7 +113,7 @@ export default function ActiveAssignments() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium">Workers with Tools</CardTitle>
@@ -137,7 +137,7 @@ export default function ActiveAssignments() {
               {activeAssignments.map(assignment => {
                 const daysOut = getDaysOut(assignment.checkoutDate);
                 const isLongCheckout = daysOut > 7;
-                
+
                 return (
                   <Card key={assignment.id} className={isLongCheckout ? 'border-warning' : ''}>
                     <CardHeader>
@@ -202,7 +202,7 @@ export default function ActiveAssignments() {
                 <div className="text-2xl font-bold">{completedAssignments.length}</div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium">Tools Returned</CardTitle>
@@ -213,7 +213,7 @@ export default function ActiveAssignments() {
                 </div>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium">Avg. Days Out</CardTitle>
@@ -222,13 +222,13 @@ export default function ActiveAssignments() {
                 <div className="text-2xl font-bold">
                   {completedAssignments.length > 0
                     ? Math.round(
-                        completedAssignments.reduce((sum, a) => {
-                          if (a.checkinDate) {
-                            return sum + (new Date(a.checkinDate).getTime() - new Date(a.checkoutDate).getTime()) / (1000 * 60 * 60 * 24);
-                          }
-                          return sum;
-                        }, 0) / completedAssignments.length
-                      )
+                      completedAssignments.reduce((sum, a) => {
+                        if (a.checkinDate) {
+                          return sum + (new Date(a.checkinDate).getTime() - new Date(a.checkoutDate).getTime()) / (1000 * 60 * 60 * 24);
+                        }
+                        return sum;
+                      }, 0) / completedAssignments.length
+                    )
                     : 0}
                 </div>
               </CardContent>
@@ -247,7 +247,7 @@ export default function ActiveAssignments() {
                 const duration = assignment.checkinDate
                   ? Math.floor((new Date(assignment.checkinDate).getTime() - new Date(assignment.checkoutDate).getTime()) / (1000 * 60 * 60 * 24))
                   : 0;
-                
+
                 return (
                   <Card key={assignment.id}>
                     <CardHeader>
@@ -282,7 +282,7 @@ export default function ActiveAssignments() {
                             {assignment.tools.map(tool => {
                               const condition = assignment.toolConditions?.[tool.id] || 'good';
                               const ConditionIcon = getConditionIcon(condition);
-                              
+
                               return (
                                 <Badge key={tool.id} className={getConditionBadgeClass(condition)}>
                                   <ConditionIcon className="mr-1 h-3 w-3" />
@@ -292,7 +292,7 @@ export default function ActiveAssignments() {
                             })}
                           </div>
                         </div>
-                        
+
                         {assignment.checkinNotes && (
                           <div>
                             <p className="font-semibold mb-1">Notes:</p>
@@ -318,7 +318,7 @@ export default function ActiveAssignments() {
               Review each tool's condition and add any notes
             </DialogDescription>
           </DialogHeader>
-          
+
           {checkInDialog && (
             <div className="space-y-6">
               {checkInDialog.tools.map(tool => (
@@ -326,7 +326,7 @@ export default function ActiveAssignments() {
                   <Label className="text-base font-semibold">{tool.name}</Label>
                   <RadioGroup
                     value={toolConditions[tool.id]}
-                    onValueChange={(value: 'good' | 'damaged' | 'lost') => 
+                    onValueChange={(value: 'good' | 'damaged' | 'lost') =>
                       setToolConditions({ ...toolConditions, [tool.id]: value })
                     }
                   >
@@ -356,7 +356,7 @@ export default function ActiveAssignments() {
                   </RadioGroup>
                 </div>
               ))}
-              
+
               <div className="space-y-2">
                 <Label>Notes (Optional)</Label>
                 <Textarea
@@ -368,7 +368,7 @@ export default function ActiveAssignments() {
               </div>
             </div>
           )}
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setCheckInDialog(null)}>Cancel</Button>
             <Button onClick={handleCheckIn}>Confirm Check-In</Button>

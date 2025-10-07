@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Search, ArrowUpDown, Folder, Wrench } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, ArrowUpDown, Folder, Wrench, User, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,7 +43,7 @@ export default function WorkersProjects() {
   const [workerFormData, setWorkerFormData] = useState({ name: '', employeeId: '' });
   const [workerSearch, setWorkerSearch] = useState('');
   const [deleteWorkerConfirm, setDeleteWorkerConfirm] = useState<number | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'name', direction: 'asc' });
+
   
   // Project state
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
@@ -51,6 +51,54 @@ export default function WorkersProjects() {
   const [projectFormData, setProjectFormData] = useState({ name: '' });
   const [projectSearch, setProjectSearch] = useState('');
   const [deleteProjectConfirm, setDeleteProjectConfirm] = useState<number | null>(null);
+
+  // Worker sort controls
+  const [workerSortField, setWorkerSortField] = useState<'name' | null>(null);
+  const [workerSortDirection, setWorkerSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleWorkerSort = (field: 'name') => {
+    if (workerSortField === field) {
+      if (workerSortDirection === 'asc') {
+        setWorkerSortDirection('desc');
+      } else {
+        // Reset to unsorted
+        setWorkerSortField(null);
+        setWorkerSortDirection('asc');
+      }
+    } else {
+      setWorkerSortField(field);
+      setWorkerSortDirection('asc');
+    }
+  };
+
+  const getWorkerSortIcon = (field: 'name') => {
+    if (workerSortField !== field) return ArrowUpDown;
+    return workerSortDirection === 'asc' ? ArrowUp : ArrowDown;
+  };
+
+  // Project sort controls
+  const [projectSortField, setProjectSortField] = useState<'name' | null>(null);
+  const [projectSortDirection, setProjectSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleProjectSort = (field: 'name') => {
+    if (projectSortField === field) {
+      if (projectSortDirection === 'asc') {
+        setProjectSortDirection('desc');
+      } else {
+        // Reset to unsorted
+        setProjectSortField(null);
+        setProjectSortDirection('asc');
+      }
+    } else {
+      setProjectSortField(field);
+      setProjectSortDirection('asc');
+    }
+  };
+
+  const getProjectSortIcon = (field: 'name') => {
+    if (projectSortField !== field) return ArrowUpDown;
+    return projectSortDirection === 'asc' ? ArrowUp : ArrowDown;
+  };
 
   // Worker functions
   const openWorkerDialog = (worker?: Worker) => {
@@ -176,14 +224,16 @@ export default function WorkersProjects() {
       ...(workerStats.get(w.id) || { projectCount: 0, toolCount: 0 })
     }));
 
-    if (sortConfig !== null) {
+    if (workerSortField !== null) {
       sortableWorkers.sort((a, b) => {
-        const key = sortConfig.key as keyof typeof a;
-        if (a[key] < b[key]) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (a[key] > b[key]) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
+        const aValue = a[workerSortField];
+        const bValue = b[workerSortField];
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const aLower = aValue.toLowerCase();
+          const bLower = bValue.toLowerCase();
+          if (aLower < bLower) return workerSortDirection === 'asc' ? -1 : 1;
+          if (aLower > bLower) return workerSortDirection === 'asc' ? 1 : -1;
         }
         return 0;
       });
@@ -193,19 +243,25 @@ export default function WorkersProjects() {
       w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
       w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
     );
-  }, [workers, workerSearch, sortConfig, workerStats]);
+  }, [workers, workerSearch, workerSortField, workerSortDirection, workerStats]);
 
-  const requestSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
 
-  const filteredProjects = projects.filter(p => 
-    p.name.toLowerCase().includes(projectSearch.toLowerCase())
-  );
+
+  const filteredProjects = projects
+    .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+    .sort((a, b) => {
+      if (!projectSortField) return 0;
+      
+      let aValue = a[projectSortField];
+      let bValue = b[projectSortField];
+      
+      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+      
+      if (aValue < bValue) return projectSortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return projectSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   return (
     <div className="space-y-6">
@@ -233,8 +289,8 @@ export default function WorkersProjects() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="mb-4">
-                <div className="relative">
+              <div className="mb-4 flex items-center gap-4">
+                <div className="relative flex-1">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search workers..."
@@ -243,6 +299,8 @@ export default function WorkersProjects() {
                     className="pl-8"
                   />
                 </div>
+                
+
               </div>
               
               {sortedAndFilteredWorkers.length === 0 ? (
@@ -251,23 +309,36 @@ export default function WorkersProjects() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="cursor-pointer" onClick={() => requestSort('name')}>
-                        <div className="flex items-center">Name <ArrowUpDown className="ml-2 h-4 w-4" /></div>
+                      <TableHead>
+                        <Button
+                          variant="ghost"
+                          className="h-auto p-0 font-semibold hover:bg-transparent"
+                          onClick={() => handleWorkerSort('name')}
+                        >
+                          Name
+                          {(() => {
+                            const Icon = getWorkerSortIcon('name');
+                            return <Icon className="ml-2 h-4 w-4" />;
+                          })()}
+                        </Button>
                       </TableHead>
                       <TableHead>Employee ID</TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => requestSort('projectCount')}>
-                        <div className="flex items-center">Assigned Projects <ArrowUpDown className="ml-2 h-4 w-4" /></div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer" onClick={() => requestSort('toolCount')}>
-                        <div className="flex items-center">Assigned Tools <ArrowUpDown className="ml-2 h-4 w-4" /></div>
-                      </TableHead>
+                      <TableHead>Assigned Projects</TableHead>
+                      <TableHead>Assigned Tools</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedAndFilteredWorkers.map(worker => (
                       <TableRow key={worker.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium">{worker.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            {worker.name}
+                          </div>
+                        </TableCell>
                         <TableCell>{worker.employeeId}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -337,14 +408,33 @@ export default function WorkersProjects() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Project Name</TableHead>
+                      <TableHead>
+                        <Button
+                          variant="ghost"
+                          className="h-auto p-0 font-semibold hover:bg-transparent"
+                          onClick={() => handleProjectSort('name')}
+                        >
+                          Project Name
+                          {(() => {
+                            const Icon = getProjectSortIcon('name');
+                            return <Icon className="ml-2 h-4 w-4" />;
+                          })()}
+                        </Button>
+                      </TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map(project => (
                       <TableRow key={project.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium">{project.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center flex-shrink-0">
+                              <Folder className="h-4 w-4 text-secondary-foreground" />
+                            </div>
+                            {project.name}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             <Button

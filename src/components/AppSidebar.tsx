@@ -68,9 +68,9 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
 
         <SidebarGroup>
           {/* Logo Section - Always show logo icon, hide text when collapsed */}
-          <div className="flex items-center gap-2 px-3 py-4">
-            <img src="/logo.png" alt="QTools Logo" className="h-8 w-8 flex-shrink-0" />
-            <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
+          <div className="flex items-start gap-2 px-3 pt-2 pb-3 border-b border-border/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center">
+            <img src="/logo.png" alt="QTools Logo" className="h-8 w-8 flex-shrink-0 min-w-[2rem]" />
+            <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden transition-opacity duration-200">
               QTools
             </span>
           </div>

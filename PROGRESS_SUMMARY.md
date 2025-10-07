@@ -20,6 +20,10 @@
 ### 🎨 Professional UI/UX Overhaul
 - **Tool Creation Dialog** - Complete redesign with 3-column layout
 - **Image Upload Component** - File browser, drag-drop, and URL input
+- **Flexible View Options** - Grid/List views with customizable column density
+- **Advanced Sorting System** - Visual feedback with dynamic sort icons
+- **Table Header Sorting** - Intuitive click-to-sort functionality
+- **Generic UI Icons** - Consistent user and folder icons for visual hierarchy
 - **Enhanced Form Validation** - Better error handling and feedback
 - **Responsive Design** - Mobile and desktop optimized
 - **Loading States** - Smooth animations and transitions
@@ -28,6 +32,14 @@
 - **HTTPS Server** accessible across local network
 - **Dynamic IP Detection** for automatic configuration
 - **Concurrent Server Management** - Single command deployment
+
+### 🔧 Latest Enhancements (v2.1.0)
+- **User-Configurable Layouts** - Tools page with grid/list toggle and column density
+- **Visual Sort Feedback** - Dynamic icons showing sort state (unsorted/asc/desc)
+- **Table Header Sorting** - Click column headers in Workers & Projects tables
+- **Critical Bug Fixes** - Checkout page loading, database schema, edit functionality
+- **Enhanced File Uploads** - Improved image handling with server-side processing
+- **Better Mobile Experience** - Improved responsive design and navigation
 - **VS Code Integration** - Professional development environment
 - **Comprehensive Documentation** - Setup and deployment guides
 

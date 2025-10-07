@@ -29,7 +29,7 @@ const AppContent = () => {
       case 'workers-projects':
         return <WorkersProjects />;
       case 'checkout':
-        return <CheckoutWizard />;
+        return <CheckoutWizard onNavigate={setCurrentPage} />;
       case 'assignments':
         return <ActiveAssignments />;
       case 'reports':
@@ -53,11 +53,11 @@ const AppContent = () => {
       <div className="flex-1 flex flex-col">
         {/* Enhanced Top Bar */}
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-14 items-center justify-between px-4">
+          <div className="flex h-14 items-start justify-between px-4 pt-3">
             {/* Mobile Layout: Logo + Menu button on left, Theme toggle on right */}
             {isMobile ? (
               <>
-                <div className="flex items-center gap-3">
+                <div className="flex items-start gap-3">
                   <img src="/logo.png" alt="QTools Logo" className="h-8 w-8" />
                   <Button
                     variant="ghost"
@@ -69,7 +69,9 @@ const AppContent = () => {
                     <span className="sr-only">Toggle sidebar</span>
                   </Button>
                 </div>
-                <ThemeToggle />
+                <div className="pt-0">
+                  <ThemeToggle />
+                </div>
               </>
             ) : (
               /* Desktop Layout: Menu button on left, Theme toggle on right */
@@ -83,14 +85,18 @@ const AppContent = () => {
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle sidebar</span>
                 </Button>
-                <ThemeToggle />
+                <div className="pt-0">
+                  <ThemeToggle />
+                </div>
               </>
             )}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto">
-          <div className="container mx-auto p-6">
-            {renderPage()}
+          <div className="container mx-auto p-6 pt-0">
+            <div className={`${isMobile ? 'pt-32' : 'pt-6'}`}>
+              {renderPage()}
+            </div>
           </div>
         </main>
       </div>
