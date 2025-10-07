@@ -74,8 +74,9 @@ router.get('/:id', async (req, res) => {
 // POST /api/tools - Create new tool
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, category, status = 'Available', isCalibrable, calibrationDue, customAttributes } = req.body;
-    const image = req.file ? `/uploads/${req.file.filename}` : null;
+    const { name, category, status = 'Available', isCalibrable, calibrationDue, customAttributes, imageUrl } = req.body;
+    // Handle both file uploads and URL inputs
+    const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl || null);
 
     const result = await runQuery(`
       INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, image, customAttributes)
@@ -112,8 +113,9 @@ router.post('/', upload.single('image'), async (req, res) => {
 // PUT /api/tools/:id - Update tool
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
-    const { name, category, status, isCalibrable, calibrationDue, customAttributes } = req.body;
-    const image = req.file ? `/uploads/${req.file.filename}` : undefined;
+    const { name, category, status, isCalibrable, calibrationDue, customAttributes, imageUrl } = req.body;
+    // Handle both file uploads and URL inputs
+    const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl !== undefined ? imageUrl : undefined);
 
     // Build update query dynamically
     let updateFields = [];

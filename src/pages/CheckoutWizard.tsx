@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder, Wrench } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 
-export default function CheckoutWizard() {
-  const navigate = useNavigate();
+interface CheckoutWizardProps {
+  onNavigate: (page: string) => void;
+}
+
+export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps) {
   const { tools, workers, projects, createAssignment } = useAppData();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedTools, setSelectedTools] = useState<Tool[]>([]);
@@ -94,7 +96,7 @@ export default function CheckoutWizard() {
         setSelectedProject(null);
 
         // Navigate to assignments
-        navigate('/assignments');
+        onNavigate('assignments');
       } catch (error) {
         toast.error('Failed to complete checkout. Please try again.');
         console.error('Error creating assignment:', error);
