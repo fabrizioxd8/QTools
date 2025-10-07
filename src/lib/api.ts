@@ -47,29 +47,73 @@ class ApiClient {
   }
 
   async createTool(tool: Omit<Tool, 'id'>): Promise<Tool> {
-    // Prepare the tool data with properly stringified customAttributes
-    const toolData = {
-      ...tool,
-      customAttributes: JSON.stringify(tool.customAttributes || {})
-    };
+    // Create FormData for proper file/data handling
+    const formData = new FormData();
     
-    return this.request<Tool>('/tools', {
-      method: 'POST',
-      body: JSON.stringify(toolData),
-    });
+    formData.append('name', tool.name);
+    formData.append('category', tool.category);
+    formData.append('status', tool.status);
+    formData.append('isCalibrable', tool.isCalibrable.toString());
+    
+    if (tool.calibrationDue) {
+      formData.append('calibrationDue', tool.calibrationDue);
+    }
+    
+    // Handle image - if it's a URL, send as string; if it's a file, it would be handled differently
+    if (tool.image) {
+      formData.append('imageUrl', tool.image);
+    }
+    
+    formData.append('customAttributes', JSON.stringify(tool.customAttributes || {}));
+    
+    const url = `${this.baseUrl}/tools`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData, // Send as FormData instead of JSON
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json() as Tool;
+    } catch (error) {
+      console.error(`API request failed: ${url}`, error);
+      throw error;
+    }
   }
 
   async updateTool(id: number, tool: Partial<Tool>): Promise<Tool> {
-    // Prepare the tool data with properly stringified customAttributes
-    const toolData = {
-      ...tool,
-      ...(tool.customAttributes && { customAttributes: JSON.stringify(tool.customAttributes) })
-    };
+    // Create FormData for proper file/data handling
+    const formData = new FormData();
     
-    return this.request<Tool>(`/tools/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(toolData),
-    });
+    if (tool.name) formData.append('name', tool.name);
+    if (tool.category) formData.append('category', tool.category);
+    if (tool.status) formData.append('status', tool.status);
+    if (tool.isCalibrable !== undefined) formData.append('isCalibrable', tool.isCalibrable.toString());
+    if (tool.calibrationDue) formData.append('calibrationDue', tool.calibrationDue);
+    if (tool.image) formData.append('imageUrl', tool.image);
+    if (tool.customAttributes) formData.append('customAttributes', JSON.stringify(tool.customAttributes));
+    
+    const url = `${this.baseUrl}/tools/${id}`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json() as Tool;
+    } catch (error) {
+      console.error(`API request failed: ${url}`, error);
+      throw error;
+    }
   }
 
   async deleteTool(id: number): Promise<{ message: string }> {

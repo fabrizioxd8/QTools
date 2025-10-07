@@ -29,7 +29,7 @@ const AppContent = () => {
       case 'workers-projects':
         return <WorkersProjects />;
       case 'checkout':
-        return <CheckoutWizard />;
+        return <CheckoutWizard onNavigate={setCurrentPage} />;
       case 'assignments':
         return <ActiveAssignments />;
       case 'reports':
