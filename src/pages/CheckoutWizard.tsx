@@ -419,8 +419,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
         className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t shadow-2xl p-4 transition-all duration-200 ease-in-out ${isMobile
             ? 'left-0'
             : state === 'collapsed'
-              ? 'left-16'
-              : 'left-60'
+              ? 'left-12'
+              : 'left-64'
           }`}
         style={{
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)'

@@ -38,40 +38,43 @@ export default function Reports() {
     return checkoutDate >= startDate && checkoutDate <= today;
   });
 
-  // Calculate activity log
-  const activityLog: Array<{
-    date: string;
-    action: 'Checkout' | 'Check-in';
-    worker: string;
-    project: string;
-    tool: string;
-  }> = [];
+  // Calculate activity log (memoized)
+  const activityLog = useMemo(() => {
+    const log: Array<{
+      date: string;
+      action: 'Checkout' | 'Check-in';
+      worker: string;
+      project: string;
+      tool: string;
+    }> = [];
 
-  filteredAssignments.forEach(assignment => {
-    assignment.tools.forEach(tool => {
-      activityLog.push({
-        date: assignment.checkoutDate,
-        action: 'Checkout',
-        worker: assignment.worker.name,
-        project: assignment.project.name,
-        tool: tool.name,
-      });
-    });
-
-    if (assignment.checkinDate) {
+    filteredAssignments.forEach(assignment => {
       assignment.tools.forEach(tool => {
-        activityLog.push({
-          date: assignment.checkinDate!,
-          action: 'Check-in',
+        log.push({
+          date: assignment.checkoutDate,
+          action: 'Checkout',
           worker: assignment.worker.name,
           project: assignment.project.name,
           tool: tool.name,
         });
       });
-    }
-  });
 
-  activityLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      if (assignment.checkinDate) {
+        assignment.tools.forEach(tool => {
+          log.push({
+            date: assignment.checkinDate!,
+            action: 'Check-in',
+            worker: assignment.worker.name,
+            project: assignment.project.name,
+            tool: tool.name,
+          });
+        });
+      }
+    });
+
+    log.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return log;
+  }, [filteredAssignments]);
 
   const paginatedLog = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -231,13 +234,13 @@ export default function Reports() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Activity Log */}
-        <Card ref={activityLogRef} className="lg:col-span-3">
+        <Card ref={activityLogRef} className="lg:col-span-3 min-w-0">
           <CardHeader>
             <CardTitle>Activity Log</CardTitle>
           <CardDescription>Recent tool checkout and check-in activities</CardDescription>
         </CardHeader>
         <CardContent>
-          {activityLog.length === 0 ? (
+            {activityLog.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No activities in this date range</p>
           ) : (
             <div className="overflow-x-auto">
@@ -304,13 +307,14 @@ export default function Reports() {
       </Card>
 
         {/* Inventory Status by Category */}
-        <Card className="lg:col-span-2">
+  <Card className="lg:col-span-2 min-w-0">
           <CardHeader>
             <CardTitle>Tool Inventory Status</CardTitle>
           <CardDescription>Breakdown by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Category</TableHead>
@@ -333,7 +337,8 @@ export default function Reports() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </CardContent>
       </Card>
       </div>
