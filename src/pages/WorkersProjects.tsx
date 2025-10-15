@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Search, ArrowUpDown, Folder, Wrench, User, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, ArrowUpDown, Folder, Wrench, User, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,14 @@ import {
 
 export default function WorkersProjects() {
   const { workers, projects, assignments, addWorker, updateWorker, deleteWorker, addProject, updateProject, deleteProject } = useAppData();
+  const [expandedWorkerIds, setExpandedWorkerIds] = useState<number[]>([]);
+  const [expandedProjectIds, setExpandedProjectIds] = useState<number[]>([]);
+  const toggleWorkerExpand = (id: number) => {
+    setExpandedWorkerIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+  const toggleProjectExpand = (id: number) => {
+    setExpandedProjectIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
   
   // Worker state
   const [isWorkerDialogOpen, setIsWorkerDialogOpen] = useState(false);
@@ -219,7 +227,7 @@ export default function WorkersProjects() {
   }, [assignments]);
 
   const sortedAndFilteredWorkers = useMemo(() => {
-    let sortableWorkers = workers.map(w => ({
+    const sortableWorkers = workers.map(w => ({
       ...w,
       ...(workerStats.get(w.id) || { projectCount: 0, toolCount: 0 })
     }));
@@ -306,7 +314,8 @@ export default function WorkersProjects() {
               {sortedAndFilteredWorkers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No workers found</p>
               ) : (
-                <Table>
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>
@@ -322,30 +331,45 @@ export default function WorkersProjects() {
                           })()}
                         </Button>
                       </TableHead>
-                      <TableHead>Employee ID</TableHead>
-                      <TableHead>Assigned Projects</TableHead>
-                      <TableHead>Assigned Tools</TableHead>
+                      <TableHead className="hidden md:table-cell">Employee ID</TableHead>
+                      <TableHead className="hidden md:table-cell">Assigned Projects</TableHead>
+                      <TableHead className="hidden md:table-cell">Assigned Tools</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {sortedAndFilteredWorkers.map(worker => (
-                      <TableRow key={worker.id} className="hover:bg-muted/50">
+                      <>
+                        <TableRow key={worker.id} className="hover:bg-muted/50">
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                               <User className="h-4 w-4 text-primary" />
                             </div>
-                            {worker.name}
+                              <div className="min-w-0">
+                                <button
+                                  className="flex items-center text-left w-full truncate md:cursor-auto"
+                                  onClick={() => toggleWorkerExpand(worker.id)}
+                                  aria-expanded={expandedWorkerIds.includes(worker.id)}
+                                >
+                                  <span className="block truncate">{worker.name}</span>
+                                  <span
+                                    className={`ml-2 inline-block md:hidden transform transition-transform duration-150 ${expandedWorkerIds.includes(worker.id) ? 'rotate-180' : ''}`}
+                                    aria-hidden
+                                  >
+                                    <ChevronDown className="h-4 w-4" />
+                                  </span>
+                                </button>
+                              </div>
                           </div>
                         </TableCell>
-                        <TableCell>{worker.employeeId}</TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">{worker.employeeId}</TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex items-center gap-2">
                             <Folder className="h-4 w-4 text-muted-foreground" /> {worker.projectCount}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex items-center gap-2">
                             <Wrench className="h-4 w-4 text-muted-foreground" /> {worker.toolCount}
                           </div>
@@ -368,10 +392,24 @@ export default function WorkersProjects() {
                             </Button>
                           </div>
                         </TableCell>
-                      </TableRow>
+                        </TableRow>
+                        {/* Expandable details row for small screens */}
+                        {expandedWorkerIds.includes(worker.id) ? (
+                          <TableRow key={`details-${worker.id}`}>
+                            <TableCell className="md:hidden" colSpan={5}>
+                              <div className="space-y-2">
+                                <div className="text-sm"><strong>Employee ID:</strong> {worker.employeeId}</div>
+                                <div className="text-sm"><strong>Assigned Projects:</strong> {worker.projectCount}</div>
+                                <div className="text-sm"><strong>Assigned Tools:</strong> {worker.toolCount}</div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -405,7 +443,8 @@ export default function WorkersProjects() {
               {filteredProjects.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No projects found</p>
               ) : (
-                <Table>
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>
@@ -426,13 +465,28 @@ export default function WorkersProjects() {
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map(project => (
-                      <TableRow key={project.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-3">
+                      <>
+                        <TableRow key={project.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium min-w-0">
+                          <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center flex-shrink-0">
                               <Folder className="h-4 w-4 text-secondary-foreground" />
                             </div>
-                            {project.name}
+                            <div className="min-w-0">
+                              <button
+                                className="flex items-center text-left w-full truncate md:cursor-auto"
+                                onClick={() => toggleProjectExpand(project.id)}
+                                aria-expanded={expandedProjectIds.includes(project.id)}
+                              >
+                                <span className="block truncate">{project.name}</span>
+                                <span
+                                  className={`ml-2 inline-block md:hidden transform transition-transform duration-150 ${expandedProjectIds.includes(project.id) ? 'rotate-180' : ''}`}
+                                  aria-hidden
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </span>
+                              </button>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -453,10 +507,22 @@ export default function WorkersProjects() {
                             </Button>
                           </div>
                         </TableCell>
-                      </TableRow>
+                        </TableRow>
+                        {expandedProjectIds.includes(project.id) ? (
+                          <TableRow key={`p-details-${project.id}`}>
+                            <TableCell className="md:hidden" colSpan={2}>
+                              <div className="space-y-2">
+                                <div className="text-sm"><strong>Project Name:</strong> {project.name}</div>
+                                {/* add more project details here if needed */}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

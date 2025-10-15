@@ -25,6 +25,11 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const [toolSearch, setToolSearch] = useState('');
   const [workerSearch, setWorkerSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
+  // Checkout date (YYYY-MM-DD) defaulting to today
+  const [checkoutDate, setCheckoutDate] = useState<string>(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
 
   const availableTools = tools.filter(t => t.status === 'Available');
   const filteredTools = availableTools.filter(t =>
@@ -82,7 +87,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     if (selectedWorker && selectedProject && selectedTools.length > 0) {
       try {
         await createAssignment({
-          checkoutDate: new Date().toISOString(),
+          // convert selected yyyy-mm-dd to full ISO so backend receives a timestamp
+          checkoutDate: new Date(checkoutDate).toISOString(),
           worker: selectedWorker,
           project: selectedProject,
           tools: selectedTools,
@@ -407,7 +413,14 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
 
               <div>
                 <h3 className="font-semibold mb-2">Checkout Date</h3>
-                <p className="text-muted-foreground">{new Date().toLocaleDateString()}</p>
+                <div className="flex items-center">
+                  <Input
+                    type="date"
+                    value={checkoutDate}
+                    onChange={(e) => setCheckoutDate(e.target.value)}
+                    className="max-w-xs h-11 pr-1"
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
@@ -419,8 +432,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
         className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t shadow-2xl p-4 transition-all duration-200 ease-in-out ${isMobile
             ? 'left-0'
             : state === 'collapsed'
-              ? 'left-16'
-              : 'left-60'
+              ? 'left-12'
+              : 'left-64'
           }`}
         style={{
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)'

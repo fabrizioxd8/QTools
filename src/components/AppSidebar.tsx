@@ -53,7 +53,9 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
       <SidebarContent>
         {/* Mobile Close Button */}
         {isMobile && (
-          <div className="flex justify-end p-2 lg:hidden">
+          // Position the close button absolutely so it doesn't affect layout flow
+          // (prevents the sidebar content from being pushed down on small screens)
+          <div className="absolute top-2 right-2 z-50 lg:hidden">
             <Button
               variant="ghost"
               size="sm"
