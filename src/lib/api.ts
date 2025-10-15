@@ -12,6 +12,11 @@ class ApiClient {
     this.baseUrl = API_BASE_URL;
   }
 
+  // Type guard to detect File-like objects without using 'any' at usage sites
+  private isFileLike(obj: unknown): obj is File {
+    return !!obj && typeof obj === 'object' && 'size' in (obj as Record<string, unknown>) && 'name' in (obj as Record<string, unknown>);
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
@@ -54,14 +59,18 @@ class ApiClient {
     formData.append('category', tool.category);
     formData.append('status', tool.status);
     formData.append('isCalibrable', tool.isCalibrable.toString());
+    if (tool.certificateNumber) formData.append('certificateNumber', tool.certificateNumber);
+    if (typeof tool.quantity !== 'undefined') formData.append('quantity', String(tool.quantity));
     
     if (tool.calibrationDue) {
       formData.append('calibrationDue', tool.calibrationDue);
     }
     
-    // Handle image - if it's a URL, send as string; if it's a file, it would be handled differently
-    if (tool.image) {
-      formData.append('imageUrl', tool.image);
+    // Handle image - if it's a File-like object, append as 'image' so multer can save it; if it's a URL/string, send as imageUrl
+    if (this.isFileLike(tool.image)) {
+      formData.append('image', tool.image as unknown as Blob);
+    } else if (tool.image) {
+      formData.append('imageUrl', tool.image as string);
     }
     
     formData.append('customAttributes', JSON.stringify(tool.customAttributes || {}));
@@ -94,8 +103,14 @@ class ApiClient {
     if (tool.status) formData.append('status', tool.status);
     if (tool.isCalibrable !== undefined) formData.append('isCalibrable', tool.isCalibrable.toString());
     if (tool.calibrationDue) formData.append('calibrationDue', tool.calibrationDue);
-    if (tool.image) formData.append('imageUrl', tool.image);
+    if (tool.image && this.isFileLike(tool.image)) {
+      formData.append('image', tool.image as unknown as Blob);
+    } else if (tool.image) {
+      formData.append('imageUrl', tool.image as string);
+    }
     if (tool.customAttributes) formData.append('customAttributes', JSON.stringify(tool.customAttributes));
+    if (tool.certificateNumber !== undefined) formData.append('certificateNumber', tool.certificateNumber || '');
+    if (tool.quantity !== undefined) formData.append('quantity', String(tool.quantity));
     
     const url = `${this.baseUrl}/tools/${id}`;
     
@@ -181,7 +196,7 @@ class ApiClient {
     checkoutDate: string;
     workerId: number;
     projectId: number;
-    toolIds: number[];
+    tools: { toolId: number; quantity: number }[];
   }): Promise<Assignment> {
     return this.request<Assignment>('/assignments', {
       method: 'POST',
@@ -206,3 +221,20 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+
+// Helper to build an absolute URL for uploaded files stored under /uploads on the API server
+export function getUploadUrl(path?: string | null) {
+  if (!path) return '';
+  // If it's already an absolute URL, return as-is
+  if (typeof path === 'string' && (/^https?:\/\//i).test(path)) return path;
+
+  // Determine API origin similar to API_BASE_URL logic
+  const apiSetting = import.meta.env.VITE_API_URL;
+  const origin = apiSetting === 'auto'
+    ? `${window.location.protocol}//${window.location.hostname}:3000`
+    : (apiSetting || 'https://localhost:3000');
+
+  // If path already includes leading slash, just concatenate
+  if (path.startsWith('/')) return `${origin}${path}`;
+  return `${origin}/${path}`;
+}

@@ -56,6 +56,17 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded images
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
 
+// Ensure uploads directory exists (multer will write files here)
+try {
+  const uploadsDir = join(__dirname, 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('Created uploads directory:', uploadsDir);
+  }
+} catch (err) {
+  console.error('Failed to ensure uploads directory:', err);
+}
+
 // Initialize database
 initializeDatabase();
 

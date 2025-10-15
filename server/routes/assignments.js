@@ -36,6 +36,9 @@ router.get('/', async (req, res) => {
             t.status,
             t.isCalibrable,
             t.calibrationDue,
+            t.certificateNumber,
+            t.quantity as availableQuantity,
+            at.quantity as assignedQuantity,
             t.image,
             t.customAttributes
           FROM assignment_tools at
@@ -46,7 +49,8 @@ router.get('/', async (req, res) => {
         const parsedTools = tools.map(tool => ({
           ...tool,
           isCalibrable: Boolean(tool.isCalibrable),
-          customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
+          customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {},
+          quantity: tool.assignedQuantity
         }));
 
         return {
@@ -77,34 +81,61 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/assignments - Create new assignment
+// POST /api/assignments - Create new assignment (quantity-aware)
 router.post('/', async (req, res) => {
   try {
-    const { checkoutDate, workerId, projectId, toolIds } = req.body;
+    const { checkoutDate, workerId, projectId, tools } = req.body;
 
-    if (!checkoutDate || !workerId || !projectId || !toolIds || !Array.isArray(toolIds)) {
+    if (!checkoutDate || !workerId || !projectId || !tools || !Array.isArray(tools)) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Create assignment
-    const result = await runQuery(`
-      INSERT INTO assignments (checkoutDate, workerId, projectId, status)
-      VALUES (?, ?, ?, 'active')
-    `, [checkoutDate, workerId, projectId]);
+    // Validate tools format: [{ toolId, quantity }]
+    for (const t of tools) {
+      if (!t.toolId || typeof t.quantity !== 'number' || t.quantity < 1) {
+        return res.status(400).json({ error: 'Invalid tools payload' });
+      }
+    }
 
-    const assignmentId = result.id;
+    // Start transaction for atomic checkout
+    await runQuery('BEGIN TRANSACTION');
+    let assignmentId;
+    try {
+      // Create assignment
+      const result = await runQuery(`
+        INSERT INTO assignments (checkoutDate, workerId, projectId, status)
+        VALUES (?, ?, ?, 'active')
+      `, [checkoutDate, workerId, projectId]);
 
-    // Add tools to assignment
-    for (const toolId of toolIds) {
-      await runQuery(`
-        INSERT INTO assignment_tools (assignmentId, toolId)
-        VALUES (?, ?)
-      `, [assignmentId, toolId]);
+      assignmentId = result.id;
 
-      // Update tool status to "In Use"
-      await runQuery(`
-        UPDATE tools SET status = 'In Use' WHERE id = ?
-      `, [toolId]);
+      // Process each tool: ensure enough quantity, insert assignment_tools with quantity, decrement tools.quantity
+      for (const t of tools) {
+        // Check available quantity
+        const toolRow = await getQuery(`SELECT id, quantity FROM tools WHERE id = ?`, [t.toolId]);
+        const available = toolRow ? (toolRow.quantity || 0) : 0;
+        if (available < t.quantity) {
+          // Not enough: rollback and return error
+          await runQuery('ROLLBACK');
+          return res.status(400).json({ error: `Not enough quantity for tool ${t.toolId}` });
+        }
+
+        await runQuery(`
+          INSERT INTO assignment_tools (assignmentId, toolId, quantity)
+          VALUES (?, ?, ?)
+        `, [assignmentId, t.toolId, t.quantity]);
+
+        // Decrement available quantity and mark as In Use (any checked-out units => In Use)
+        await runQuery(`
+          UPDATE tools SET quantity = quantity - ?, status = 'In Use' WHERE id = ?
+        `, [t.quantity, t.toolId]);
+      }
+
+      await runQuery('COMMIT');
+    } catch (err) {
+      console.error('Error during assignment transaction:', err);
+      try { await runQuery('ROLLBACK'); } catch (e) { console.error('Rollback failed:', e); }
+      return res.status(500).json({ error: 'Failed to create assignment' });
     }
 
     // Fetch the complete assignment
@@ -127,7 +158,7 @@ router.post('/', async (req, res) => {
       WHERE a.id = ?
     `, [assignmentId]);
 
-    const tools = await allQuery(`
+    const toolsRows = await allQuery(`
       SELECT 
         t.id,
         t.name,
@@ -135,6 +166,9 @@ router.post('/', async (req, res) => {
         t.status,
         t.isCalibrable,
         t.calibrationDue,
+        t.certificateNumber,
+        t.quantity as availableQuantity,
+        at.quantity as assignedQuantity,
         t.image,
         t.customAttributes
       FROM assignment_tools at
@@ -142,10 +176,11 @@ router.post('/', async (req, res) => {
       WHERE at.assignmentId = ?
     `, [assignmentId]);
 
-    const parsedTools = tools.map(tool => ({
+    const parsedTools = toolsRows.map(tool => ({
       ...tool,
       isCalibrable: Boolean(tool.isCalibrable),
-      customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
+      customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {},
+      quantity: tool.assignedQuantity
     }));
 
     const completeAssignment = {
@@ -180,24 +215,48 @@ router.put('/:id/checkin', async (req, res) => {
     const { checkinNotes, toolConditions } = req.body;
     const checkinDate = new Date().toISOString();
 
-    // Update assignment
-    await runQuery(`
-      UPDATE assignments
-      SET checkinDate = ?, status = 'completed', checkinNotes = ?, toolConditions = ?
-      WHERE id = ?
-    `, [checkinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), req.params.id]);
+    // Start transaction for atomic checkin
+    await runQuery('BEGIN TRANSACTION');
+    try {
+      // Update assignment
+      await runQuery(`
+        UPDATE assignments
+        SET checkinDate = ?, status = 'completed', checkinNotes = ?, toolConditions = ?
+        WHERE id = ?
+      `, [checkinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), req.params.id]);
 
-    // Update tool statuses based on conditions
-    if (toolConditions) {
-      for (const [toolId, condition] of Object.entries(toolConditions)) {
-        let newStatus = 'Available';
-        if (condition === 'damaged') newStatus = 'Damaged';
-        else if (condition === 'lost') newStatus = 'Lost';
-
-        await runQuery(`
-          UPDATE tools SET status = ? WHERE id = ?
-        `, [newStatus, toolId]);
+      // Update tool statuses based on conditions (damaged/lost override)
+      const damagedOrLost = new Set();
+      if (toolConditions) {
+        for (const [toolId, condition] of Object.entries(toolConditions)) {
+          if (condition === 'damaged' || condition === 'lost') {
+            const newStatus = condition === 'damaged' ? 'Damaged' : 'Lost';
+            await runQuery(`UPDATE tools SET status = ? WHERE id = ?`, [newStatus, toolId]);
+            damagedOrLost.add(Number(toolId));
+          }
+        }
       }
+
+      // Restore quantities for tools assigned to this assignment
+      const assigned = await allQuery(`SELECT toolId, quantity FROM assignment_tools WHERE assignmentId = ?`, [req.params.id]);
+      for (const row of assigned) {
+        await runQuery(`UPDATE tools SET quantity = quantity + ? WHERE id = ?`, [row.quantity || 0, row.toolId]);
+
+        // If tool was not damaged/lost, and there are NO other active assignments using this tool, mark Available
+        if (!damagedOrLost.has(row.toolId)) {
+          const activeCountRow = await getQuery(`SELECT COUNT(*) as cnt FROM assignment_tools at JOIN assignments a ON at.assignmentId = a.id WHERE at.toolId = ? AND a.status = 'active'`, [row.toolId]);
+          const activeCount = activeCountRow ? activeCountRow.cnt : 0;
+          if (!activeCount || Number(activeCount) === 0) {
+            await runQuery(`UPDATE tools SET status = 'Available' WHERE id = ?`, [row.toolId]);
+          }
+        }
+      }
+
+      await runQuery('COMMIT');
+    } catch (err) {
+      console.error('Error during checkin transaction:', err);
+      try { await runQuery('ROLLBACK'); } catch (e) { console.error('Rollback failed:', e); }
+      return res.status(500).json({ error: 'Failed to check in assignment' });
     }
 
     // Fetch updated assignment

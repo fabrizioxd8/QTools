@@ -23,6 +23,10 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImageUploadBox } from '@/components/ImageUploadBox';
 import { useAppData, Tool } from '@/contexts/AppDataContext';
+import { getUploadUrl } from '@/lib/api';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
+type ExtendedTool = Tool & Partial<{ certificateNumber: string; quantity: number }>;
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -39,7 +43,7 @@ const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand T
 const statuses: Tool['status'][] = ['Available', 'In Use', 'Damaged', 'Lost', 'Cal. Due'];
 
 export default function ToolsManager() {
-  const { tools, addTool, updateTool, deleteTool } = useAppData();
+  const { tools, addTool, updateTool, deleteTool, assignments } = useAppData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -79,7 +83,9 @@ export default function ToolsManager() {
     status: 'Available' as Tool['status'],
     isCalibrable: false,
     calibrationDue: '',
-    image: '',
+    certificateNumber: '',
+    quantity: 1,
+    image: null as string | File | null,
     customAttributes: {} as Record<string, string>,
   });
 
@@ -115,13 +121,16 @@ export default function ToolsManager() {
   const openDialog = (tool?: Tool) => {
     if (tool) {
       setEditingTool(tool);
+      const t = tool as Tool & Partial<{ certificateNumber: string; quantity: number }>;
       setFormData({
         name: tool.name,
         category: tool.category,
         status: tool.status,
         isCalibrable: tool.isCalibrable,
         calibrationDue: tool.calibrationDue || '',
-        image: tool.image || '',
+        certificateNumber: t.certificateNumber || '',
+        quantity: t.quantity || 1,
+          image: tool.image || null,
         customAttributes: { ...tool.customAttributes },
       });
     } else {
@@ -132,7 +141,9 @@ export default function ToolsManager() {
         status: 'Available',
         isCalibrable: false,
         calibrationDue: '',
-        image: '',
+        certificateNumber: '',
+        quantity: 1,
+        image: null,
         customAttributes: {},
       });
     }
@@ -147,10 +158,10 @@ export default function ToolsManager() {
 
     try {
       if (editingTool) {
-        await updateTool(editingTool.id, formData);
+        await updateTool(editingTool.id, { ...formData });
         toast.success('Tool updated successfully');
       } else {
-        await addTool(formData);
+        await addTool({ ...formData });
         toast.success('Tool added successfully');
       }
 
@@ -355,7 +366,7 @@ export default function ToolsManager() {
               <CardHeader className="flex-shrink-0">
                 <div className="aspect-square mb-4 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
                   {tool.image ? (
-                    <img src={tool.image} alt={tool.name} className="w-full h-full object-cover" />
+                    <img src={getUploadUrl(tool.image as string)} alt={tool.name} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-6xl">🔧</span>
                   )}
@@ -363,7 +374,49 @@ export default function ToolsManager() {
                 <CardTitle className="text-lg">{tool.name}</CardTitle>
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline">{tool.category}</Badge>
-                  <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                  {/* Status badge with optional tooltip when In Use */}
+                  {tool.status === 'In Use' ? (
+                    (() => {
+                      // Build assignment breakdown for this tool
+                      const entries: Array<{ projectName: string; qty: number }> = [];
+                      assignments.forEach(asg => {
+                        asg.tools.forEach(t => {
+                          if (t.id === tool.id && (t.quantity || 1) > 0) {
+                            entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+                          }
+                        });
+                      });
+
+                      const hasEntries = entries.length > 0;
+
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                            </span>
+                          </TooltipTrigger>
+                          {hasEntries && (
+                            <TooltipContent>
+                              <div className="space-y-1">
+                                {entries.map((e, i) => (
+                                  <div key={i} className="text-sm">
+                                    <strong>{e.projectName}</strong>: {e.qty}
+                                  </div>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      );
+                    })()
+                  ) : (
+                    <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                  )}
+                  {/* Show quantity only when > 0 */}
+                  {('quantity' in tool && (tool as ExtendedTool).quantity > 0) && (
+                    <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
@@ -382,6 +435,9 @@ export default function ToolsManager() {
                     <p className="text-sm text-muted-foreground mb-4">
                       <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
                     </p>
+                  )}
+                  {('certificateNumber' in (tool as ExtendedTool)) && (tool as ExtendedTool).certificateNumber && (
+                    <p className="text-sm text-muted-foreground mt-2">Certificate N°: {(tool as ExtendedTool).certificateNumber}</p>
                   )}
                 </div>
 
@@ -413,7 +469,7 @@ export default function ToolsManager() {
                   {/* Tool Image/Icon */}
                   <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                     {tool.image ? (
-                      <img src={tool.image} alt={tool.name} className="w-full h-full object-cover" />
+                      <img src={getUploadUrl(tool.image as string)} alt={tool.name} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-2xl">🔧</span>
                     )}
@@ -427,6 +483,9 @@ export default function ToolsManager() {
                         <div className="flex gap-2 mt-1">
                           <Badge variant="outline">{tool.category}</Badge>
                           <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                          {('quantity' in tool && (tool as ExtendedTool).quantity) && (
+                            <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
+                          )}
                         </div>
                       </div>
 
@@ -462,6 +521,9 @@ export default function ToolsManager() {
                       <p className="text-sm text-muted-foreground mt-2">
                         <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
                       </p>
+                    )}
+                    {('certificateNumber' in (tool as ExtendedTool)) && (tool as ExtendedTool).certificateNumber && (
+                      <p className="text-sm text-muted-foreground mt-2">Certificate N°: {(tool as ExtendedTool).certificateNumber}</p>
                     )}
                   </div>
                 </div>
@@ -529,6 +591,16 @@ export default function ToolsManager() {
                     </Select>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Quantity</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) || 1 })}
+                      className="h-11 w-full max-w-xs"
+                    />
+                  </div>
                   {formData.isCalibrable && (
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold">Calibration Due Date</Label>
@@ -536,6 +608,13 @@ export default function ToolsManager() {
                         type="date"
                         value={formData.calibrationDue}
                         onChange={(e) => setFormData({ ...formData, calibrationDue: e.target.value })}
+                        className="h-11"
+                      />
+                      <Label className="text-sm font-semibold">Certificate N°</Label>
+                      <Input
+                        value={formData.certificateNumber}
+                        onChange={(e) => setFormData({ ...formData, certificateNumber: e.target.value })}
+                        placeholder="Certificate number"
                         className="h-11"
                       />
                     </div>
