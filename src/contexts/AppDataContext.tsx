@@ -8,7 +8,10 @@ export interface Tool {
   status: 'Available' | 'In Use' | 'Damaged' | 'Lost' | 'Cal. Due';
   isCalibrable: boolean;
   calibrationDue?: string;
-  image?: string;
+  certificateNumber?: string;
+  quantity?: number;
+  // image can be a URL (string) or a File when the user selects one locally
+  image?: string | File | null;
   customAttributes: Record<string, string>;
 }
 
@@ -196,12 +199,13 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const createAssignment = async (assignment: Omit<Assignment, 'id' | 'status'>) => {
     try {
-      const toolIds = assignment.tools.map(tool => tool.id);
+      // Send tools with quantities (default 1) to support quantity-aware assignments
+      const toolsPayload = assignment.tools.map(tool => ({ toolId: tool.id, quantity: tool.quantity || 1 }));
       const assignmentData = {
         checkoutDate: assignment.checkoutDate,
         workerId: assignment.worker.id,
         projectId: assignment.project.id,
-        toolIds
+        tools: toolsPayload
       };
 
       const newAssignment = await apiClient.createAssignment(assignmentData);

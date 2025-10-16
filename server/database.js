@@ -28,6 +28,8 @@ export const initializeDatabase = () => {
       status TEXT NOT NULL DEFAULT 'Available',
       isCalibrable BOOLEAN DEFAULT 0,
       calibrationDue TEXT,
+      certificateNumber TEXT,
+      quantity INTEGER DEFAULT 1,
       image TEXT,
       customAttributes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -80,6 +82,7 @@ export const initializeDatabase = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       assignmentId INTEGER NOT NULL,
       toolId INTEGER NOT NULL,
+      quantity INTEGER DEFAULT 1,
       FOREIGN KEY (assignmentId) REFERENCES assignments (id) ON DELETE CASCADE,
       FOREIGN KEY (toolId) REFERENCES tools (id)
     )
@@ -111,6 +114,52 @@ const runMigrations = () => {
         } else {
           console.log('✅ toolConditions column added successfully');
         }
+      });
+    }
+  });
+  
+  // Ensure tools table has certificateNumber and quantity columns
++
+  db.all("PRAGMA table_info(tools)", (err, columns) => {
+    if (err) {
+      console.error('Error checking tools table schema:', err);
+      return;
+    }
+
+    const hasCertificate = columns.some(col => col.name === 'certificateNumber');
+    const hasQuantity = columns.some(col => col.name === 'quantity');
+
+    if (!hasCertificate) {
+      console.log('\u2699\ufe0f Adding certificateNumber column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN certificateNumber TEXT", (err) => {
+        if (err) console.error('Error adding certificateNumber column:', err);
+        else console.log('\u2705 certificateNumber column added successfully');
+      });
+    }
+
+    if (!hasQuantity) {
+      console.log('\u2699\ufe0f Adding quantity column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN quantity INTEGER DEFAULT 1", (err) => {
+        if (err) console.error('Error adding quantity column:', err);
+        else console.log('\u2705 quantity column added successfully');
+      });
+    }
+  });
+
+  // Ensure assignment_tools has quantity column
++
+  db.all("PRAGMA table_info(assignment_tools)", (err, columns) => {
+    if (err) {
+      console.error('Error checking assignment_tools table schema:', err);
+      return;
+    }
+
+    const hasQty = columns.some(col => col.name === 'quantity');
+    if (!hasQty) {
+      console.log('\u2699\ufe0f Adding quantity column to assignment_tools table...');
+      db.run("ALTER TABLE assignment_tools ADD COLUMN quantity INTEGER DEFAULT 1", (err) => {
+        if (err) console.error('Error adding quantity column to assignment_tools:', err);
+        else console.log('\u2705 quantity column added to assignment_tools');
       });
     }
   });
@@ -171,9 +220,9 @@ const insertSampleData = () => {
 
       sampleTools.forEach(tool => {
         db.run(`
-          INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, customAttributes)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [tool.name, tool.category, tool.status, tool.isCalibrable, tool.calibrationDue, tool.customAttributes]);
+          INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, quantity, customAttributes)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `, [tool.name, tool.category, tool.status, tool.isCalibrable, tool.calibrationDue, tool.quantity || 1, tool.customAttributes]);
       });
 
       // Sample workers

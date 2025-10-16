@@ -26,15 +26,17 @@ const upload = multer({ storage });
 router.get('/', async (req, res) => {
   try {
     const tools = await allQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
       FROM tools
       ORDER BY name
     `);
 
-    // Parse customAttributes JSON
+    // Parse customAttributes JSON and coerce types
     const parsedTools = tools.map(tool => ({
       ...tool,
-      isCalibrable: Boolean(tool.isCalibrable),
+      isCalibrable: Boolean(Number(tool.isCalibrable)),
+      certificateNumber: tool.certificateNumber || null,
+      quantity: tool.quantity !== undefined && tool.quantity !== null ? Number(tool.quantity) : undefined,
       customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
     }));
 
@@ -49,7 +51,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const tool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
       FROM tools
       WHERE id = ?
     `, [req.params.id]);
@@ -60,7 +62,9 @@ router.get('/:id', async (req, res) => {
 
     const parsedTool = {
       ...tool,
-      isCalibrable: Boolean(tool.isCalibrable),
+      isCalibrable: Boolean(Number(tool.isCalibrable)),
+      certificateNumber: tool.certificateNumber || null,
+      quantity: tool.quantity !== undefined && tool.quantity !== null ? Number(tool.quantity) : undefined,
       customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
     };
 
@@ -74,32 +78,38 @@ router.get('/:id', async (req, res) => {
 // POST /api/tools - Create new tool
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, category, status = 'Available', isCalibrable, calibrationDue, customAttributes, imageUrl } = req.body;
+  const { name, category, status = 'Available', isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl } = req.body;
     // Handle both file uploads and URL inputs
     const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl || null);
+  // Coerce isCalibrable which may come as string from FormData
+  const isCalibrableFlag = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
 
     const result = await runQuery(`
-      INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, image, customAttributes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name,
       category,
       status,
-      isCalibrable ? 1 : 0,
+      isCalibrableFlag ? 1 : 0,
       calibrationDue || null,
+      certificateNumber || null,
+      typeof quantity !== 'undefined' ? Number(quantity) : 1,
       image,
       customAttributes || '{}'
     ]);
 
     const newTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
       FROM tools
       WHERE id = ?
     `, [result.id]);
 
     const parsedTool = {
       ...newTool,
-      isCalibrable: Boolean(newTool.isCalibrable),
+      isCalibrable: Boolean(Number(newTool.isCalibrable)),
+      certificateNumber: newTool.certificateNumber || null,
+      quantity: newTool.quantity !== undefined && newTool.quantity !== null ? Number(newTool.quantity) : undefined,
       customAttributes: newTool.customAttributes ? JSON.parse(newTool.customAttributes) : {}
     };
 
@@ -113,7 +123,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 // PUT /api/tools/:id - Update tool
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
-    const { name, category, status, isCalibrable, calibrationDue, customAttributes, imageUrl } = req.body;
+  const { name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl } = req.body;
     // Handle both file uploads and URL inputs
     const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl !== undefined ? imageUrl : undefined);
 
@@ -134,12 +144,21 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateValues.push(status);
     }
     if (isCalibrable !== undefined) {
+      const isCalibrableFlagUpdate = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
       updateFields.push('isCalibrable = ?');
-      updateValues.push(isCalibrable ? 1 : 0);
+      updateValues.push(isCalibrableFlagUpdate ? 1 : 0);
     }
     if (calibrationDue !== undefined) {
       updateFields.push('calibrationDue = ?');
       updateValues.push(calibrationDue || null);
+    }
+    if (certificateNumber !== undefined) {
+      updateFields.push('certificateNumber = ?');
+      updateValues.push(certificateNumber || null);
+    }
+    if (quantity !== undefined) {
+      updateFields.push('quantity = ?');
+      updateValues.push(Number(quantity));
     }
     if (image !== undefined) {
       updateFields.push('image = ?');
@@ -160,7 +179,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     `, updateValues);
 
     const updatedTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
       FROM tools
       WHERE id = ?
     `, [req.params.id]);
@@ -171,7 +190,9 @@ router.put('/:id', upload.single('image'), async (req, res) => {
 
     const parsedTool = {
       ...updatedTool,
-      isCalibrable: Boolean(updatedTool.isCalibrable),
+      isCalibrable: Boolean(Number(updatedTool.isCalibrable)),
+      certificateNumber: updatedTool.certificateNumber || null,
+      quantity: updatedTool.quantity !== undefined && updatedTool.quantity !== null ? Number(updatedTool.quantity) : undefined,
       customAttributes: updatedTool.customAttributes ? JSON.parse(updatedTool.customAttributes) : {}
     };
 

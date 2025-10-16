@@ -31,7 +31,11 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     return d.toISOString().slice(0, 10);
   });
 
-  const availableTools = tools.filter(t => t.status === 'Available');
+  // Treat a tool as available if its status is 'Available' OR it is 'In Use' but still has quantity left
+  const availableTools = tools.filter(t => {
+    const qty = t.quantity ?? 0;
+    return t.status === 'Available' || (t.status === 'In Use' && qty > 0);
+  });
   const filteredTools = availableTools.filter(t =>
     t.name.toLowerCase().includes(toolSearch.toLowerCase())
   );
@@ -78,9 +82,14 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
       if (exists) {
         return prev.filter(t => t.id !== tool.id);
       } else {
-        return [...prev, tool];
+        // default quantity to 1 when selecting
+        return [...prev, { ...tool, quantity: 1 }];
       }
     });
+  };
+
+  const updateSelectedToolQuantity = (toolId: number, qty: number) => {
+    setSelectedTools(prev => prev.map(t => t.id === toolId ? { ...t, quantity: qty } : t));
   };
 
   const handleComplete = async () => {
@@ -225,7 +234,25 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                                 ))}
                               </div>
                             </div>
-                            <Checkbox checked={isSelected} />
+                                        <div className="flex items-center space-x-2">
+                                          <Checkbox checked={isSelected} />
+                                          {isSelected && (
+                                            <input
+                                              type="number"
+                                              min={1}
+                                              max={tool.quantity || 1}
+                                              value={selectedTools.find(t => t.id === tool.id)?.quantity || 1}
+                                              onChange={(e) => {
+                                                const max = tool.quantity || 1;
+                                                let v = Math.max(1, Number(e.target.value || 1));
+                                                if (v > max) v = max;
+                                                updateSelectedToolQuantity(tool.id, v);
+                                              }}
+                                              className="h-8 w-16 text-sm rounded border px-2"
+                                              onClick={(e) => e.stopPropagation()}
+                                            />
+                                          )}
+                                        </div>
                           </div>
                         </CardHeader>
                       </Card>
@@ -368,12 +395,20 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                 <div className="space-y-2">
                   {selectedTools.map(tool => (
                     <div key={tool.id} className="p-3 bg-muted rounded-lg">
-                      <p className="font-medium">{tool.name}</p>
-                      <p className="text-sm text-muted-foreground">{tool.category}</p>
-                      <div className="text-xs text-muted-foreground mt-1 space-x-2">
-                        {Object.entries(tool.customAttributes).map(([key, value]) => (
-                          <Badge key={key} variant="secondary" className="text-xs">{key}: {value}</Badge>
-                        ))}
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{tool.name}</p>
+                          <p className="text-sm text-muted-foreground">{tool.category}</p>
+                          <div className="text-xs text-muted-foreground mt-1 space-x-2">
+                            {Object.entries(tool.customAttributes).map(([key, value]) => (
+                              <Badge key={key} variant="secondary" className="text-xs">{key}: {value}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          <div>Qty: {tool.quantity || 1}</div>
+                          <div>Available: {tools.find(t => t.id === tool.id)?.quantity ?? 0}</div>
+                        </div>
                       </div>
                     </div>
                   ))}
