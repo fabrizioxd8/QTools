@@ -237,20 +237,24 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                                         <div className="flex items-center space-x-2">
                                           <Checkbox checked={isSelected} />
                                           {isSelected && (
-                                            <input
-                                              type="number"
-                                              min={1}
-                                              max={tool.quantity || 1}
-                                              value={selectedTools.find(t => t.id === tool.id)?.quantity || 1}
-                                              onChange={(e) => {
-                                                const max = tool.quantity || 1;
-                                                let v = Math.max(1, Number(e.target.value || 1));
-                                                if (v > max) v = max;
-                                                updateSelectedToolQuantity(tool.id, v);
-                                              }}
-                                              className="h-8 w-16 text-sm rounded border px-2"
-                                              onClick={(e) => e.stopPropagation()}
-                                            />
+                                            <div className="relative">
+                                              <Label htmlFor={`quantity-${tool.id}`} className="sr-only">Quantity for {tool.name}</Label>
+                                              <input
+                                                id={`quantity-${tool.id}`}
+                                                type="number"
+                                                min={1}
+                                                max={tool.quantity || 1}
+                                                value={selectedTools.find(t => t.id === tool.id)?.quantity || 1}
+                                                onChange={(e) => {
+                                                  const max = tool.quantity || 1;
+                                                  let v = Math.max(1, Number(e.target.value || 1));
+                                                  if (v > max) v = max;
+                                                  updateSelectedToolQuantity(tool.id, v);
+                                                }}
+                                                className="h-8 w-16 text-sm rounded border px-2"
+                                                onClick={(e) => e.stopPropagation()}
+                                              />
+                                            </div>
                                           )}
                                         </div>
                           </div>
@@ -464,15 +468,12 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
 
       {/* Navigation */}
       <div
-        className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t shadow-2xl p-4 transition-all duration-200 ease-in-out ${isMobile
+        className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 transition-all duration-200 ease-in-out shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1),0_-2px_4px_-1px_rgba(0,0,0,0.06)] ${isMobile
             ? 'left-0'
             : state === 'collapsed'
               ? 'left-12'
               : 'left-64'
           }`}
-        style={{
-          boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)'
-        }}
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center px-2">
           {currentStep === 1 && selectedTools.length > 0 && (
