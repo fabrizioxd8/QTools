@@ -44,28 +44,24 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
   // Compute preview URL depending on the incoming value
   // Use a local state for preview so we don't leak object URLs
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Clean up previous preview URL
-    if (localPreview && localPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(localPreview);
-    }
-
     if (value instanceof File) {
       const url = URL.createObjectURL(value);
+      objectUrlRef.current = url;
       setLocalPreview(url);
     } else if (typeof value === 'string' && value) {
       setLocalPreview(value);
     } else {
       setLocalPreview(null);
     }
-
     return () => {
-      if (localPreview && localPreview.startsWith('blob:')) {
-        URL.revokeObjectURL(localPreview);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return (
@@ -85,22 +81,32 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
             className="absolute top-3 right-3 p-1.5 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg hover:scale-110"
           >
             <X className="h-4 w-4" />
+            <span className="sr-only">Remove image</span>
           </button>
         </div>
       ) : (
         <div className="space-y-3">
           <div 
-            className="flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-muted/30 to-muted/60 hover:from-muted/50 hover:to-muted/80 transition-all duration-200 cursor-pointer"
+            role="button"
+            tabIndex={0}
+            className="flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-muted/30 to-muted/60 hover:from-muted/50 hover:to-muted/80 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             onClick={handleUploadClick}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                handleUploadClick();
+              }
+            }}
           >
             <Upload className="h-12 w-12 text-muted-foreground mb-3" />
             <span className="text-sm text-muted-foreground font-medium">Upload Tool Image</span>
             <span className="text-xs text-muted-foreground/70 mt-1">Click to browse or drag & drop</span>
           </div>
           
+          <label htmlFor="tool-image-upload" className="sr-only">Upload tool image</label>
           <input
+            id="tool-image-upload"
             ref={fileInputRef}
             type="file"
             accept="image/*"
@@ -131,12 +137,14 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
           </div>
           
           <div className="space-y-2">
+            <label htmlFor="imageUrl" className="sr-only">Image URL</label>
             <input
+              id="imageUrl"
               type="text"
               value={typeof value === 'string' ? value : ''}
               onChange={(e) => onChange(e.target.value)}
               placeholder="https://example.com/tool-image.jpg"
-              className="w-full px-3 py-2.5 text-sm rounded-lg border border-input bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              className="w-full px-3 py-2.5 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors"
             />
           </div>
         </div>

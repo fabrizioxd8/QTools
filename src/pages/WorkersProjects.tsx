@@ -350,7 +350,8 @@ export default function WorkersProjects() {
                                 <button
                                   className="flex items-center text-left w-full truncate md:cursor-auto"
                                   onClick={() => toggleWorkerExpand(worker.id)}
-                                  aria-expanded={expandedWorkerIds.includes(worker.id)}
+                                  aria-expanded={!!expandedWorkerIds.includes(worker.id)}
+                                  aria-controls={expandedWorkerIds.includes(worker.id) ? `details-${worker.id}` : undefined}
                                 >
                                   <span className="block truncate">{worker.name}</span>
                                   <span
@@ -394,9 +395,9 @@ export default function WorkersProjects() {
                         </TableCell>
                         </TableRow>
                         {/* Expandable details row for small screens */}
-                        {expandedWorkerIds.includes(worker.id) ? (
-                          <TableRow key={`details-${worker.id}`}>
-                            <TableCell className="md:hidden" colSpan={5}>
+                        {expandedWorkerIds.includes(worker.id) && (
+                          <TableRow id={`details-${worker.id}`}>
+                            <TableCell className="md:hidden" colSpan={5} role="region">
                               <div className="space-y-2">
                                 <div className="text-sm"><strong>Employee ID:</strong> {worker.employeeId}</div>
                                 <div className="text-sm"><strong>Assigned Projects:</strong> {worker.projectCount}</div>
@@ -404,7 +405,7 @@ export default function WorkersProjects() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : null}
+                        )}
                       </>
                     ))}
                   </TableBody>
@@ -476,7 +477,8 @@ export default function WorkersProjects() {
                               <button
                                 className="flex items-center text-left w-full truncate md:cursor-auto"
                                 onClick={() => toggleProjectExpand(project.id)}
-                                aria-expanded={expandedProjectIds.includes(project.id)}
+                                aria-expanded={!!expandedProjectIds.includes(project.id)}
+                                aria-controls={expandedProjectIds.includes(project.id) ? `p-details-${project.id}` : undefined}
                               >
                                 <span className="block truncate">{project.name}</span>
                                 <span
@@ -508,16 +510,16 @@ export default function WorkersProjects() {
                           </div>
                         </TableCell>
                         </TableRow>
-                        {expandedProjectIds.includes(project.id) ? (
-                          <TableRow key={`p-details-${project.id}`}>
-                            <TableCell className="md:hidden" colSpan={2}>
+                        {expandedProjectIds.includes(project.id) && (
+                          <TableRow id={`p-details-${project.id}`}>
+                            <TableCell className="md:hidden" colSpan={2} role="region">
                               <div className="space-y-2">
                                 <div className="text-sm"><strong>Project Name:</strong> {project.name}</div>
                                 {/* add more project details here if needed */}
                               </div>
                             </TableCell>
                           </TableRow>
-                        ) : null}
+                        )}
                       </>
                     ))}
                   </TableBody>
