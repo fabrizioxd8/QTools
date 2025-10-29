@@ -110,7 +110,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider defaultOpen={true}>
           <AppContent />
         </SidebarProvider>
       </TooltipProvider>

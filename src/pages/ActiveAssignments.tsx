@@ -15,6 +15,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAppData, Assignment } from '@/contexts/AppDataContext';
 import { toast } from 'sonner';
 
@@ -28,8 +29,16 @@ export default function ActiveAssignments() {
   const completedAssignments = assignments.filter(a => a.status === 'completed');
 
   const getDaysOut = (checkoutDate: string) => {
-    const days = Math.floor((Date.now() - new Date(checkoutDate).getTime()) / (1000 * 60 * 60 * 24));
-    return days;
+    const today = new Date();
+    const checkout = new Date(checkoutDate);
+
+    // Reset time to avoid timezone issues
+    today.setHours(0, 0, 0, 0);
+    checkout.setHours(0, 0, 0, 0);
+
+    const diffTime = today.getTime() - checkout.getTime();
+    const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, days); // Ensure we don't return negative days
   };
 
   const openCheckInDialog = (assignment: Assignment) => {
@@ -148,7 +157,7 @@ export default function ActiveAssignments() {
                             {isLongCheckout && (
                               <Badge variant="destructive">
                                 <AlertCircle className="mr-1 h-3 w-3" />
-                                {daysOut} days out
+                                {daysOut} day{daysOut !== 1 ? 's' : ''} out
                               </Badge>
                             )}
                           </div>
@@ -179,6 +188,7 @@ export default function ActiveAssignments() {
                           {assignment.tools.map(tool => (
                             <Badge key={tool.id} variant="outline">
                               {tool.name}
+                              {tool.quantity && tool.quantity > 1 && ` (${tool.quantity})`}
                             </Badge>
                           ))}
                         </div>
@@ -322,38 +332,67 @@ export default function ActiveAssignments() {
           {checkInDialog && (
             <div className="space-y-6">
               {checkInDialog.tools.map(tool => (
-                <div key={tool.id} className="space-y-2 pb-4 border-b last:border-0">
-                  <Label className="text-base font-semibold">{tool.name}</Label>
-                  <RadioGroup
-                    value={toolConditions[tool.id]}
-                    onValueChange={(value: 'good' | 'damaged' | 'lost') =>
-                      setToolConditions({ ...toolConditions, [tool.id]: value })
-                    }
-                  >
-                    <div className="flex gap-4">
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="good" id={`${tool.id}-good`} />
-                        <Label htmlFor={`${tool.id}-good`} className="cursor-pointer flex items-center">
-                          <CheckCircle className="mr-1 h-4 w-4 text-success" />
-                          Good
-                        </Label>
+                <div key={tool.id} className="space-y-3 pb-4 border-b last:border-0">
+                  <div>
+                    <Label className="text-base font-semibold">{tool.name}</Label>
+                    {Object.entries(tool.customAttributes).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {Object.entries(tool.customAttributes).map(([key, value]) => (
+                          <Badge key={key} variant="outline" className="text-xs">
+                            {key}: {value}
+                          </Badge>
+                        ))}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="damaged" id={`${tool.id}-damaged`} />
-                        <Label htmlFor={`${tool.id}-damaged`} className="cursor-pointer flex items-center">
-                          <AlertCircle className="mr-1 h-4 w-4 text-warning" />
-                          Damaged
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="lost" id={`${tool.id}-lost`} />
-                        <Label htmlFor={`${tool.id}-lost`} className="cursor-pointer flex items-center">
-                          <XCircle className="mr-1 h-4 w-4 text-destructive" />
-                          Lost
-                        </Label>
-                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${tool.id}-status-change`}
+                        checked={toolConditions[tool.id] === 'good'}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setToolConditions({ ...toolConditions, [tool.id]: 'good' });
+                          } else {
+                            setToolConditions({ ...toolConditions, [tool.id]: 'damaged' });
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`${tool.id}-status-change`} className="cursor-pointer flex items-center">
+                        <CheckCircle className="mr-1 h-4 w-4 text-success" />
+                        Tool is in good condition
+                      </Label>
                     </div>
-                  </RadioGroup>
+
+                    {toolConditions[tool.id] !== 'good' && (
+                      <div className="ml-6 space-y-2">
+                        <p className="text-sm font-medium text-muted-foreground">Select condition:</p>
+                        <RadioGroup
+                          value={toolConditions[tool.id]}
+                          onValueChange={(value: 'damaged' | 'lost') =>
+                            setToolConditions({ ...toolConditions, [tool.id]: value })
+                          }
+                        >
+                          <div className="flex gap-4">
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="damaged" id={`${tool.id}-damaged`} />
+                              <Label htmlFor={`${tool.id}-damaged`} className="cursor-pointer flex items-center">
+                                <AlertCircle className="mr-1 h-4 w-4 text-warning" />
+                                Damaged
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="lost" id={`${tool.id}-lost`} />
+                              <Label htmlFor={`${tool.id}-lost`} className="cursor-pointer flex items-center">
+                                <XCircle className="mr-1 h-4 w-4 text-destructive" />
+                                Lost
+                              </Label>
+                            </div>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
 

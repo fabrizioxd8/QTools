@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, Search, Grid3X3, List, LayoutGrid, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Pencil, Trash2, Search, Grid3X3, List, LayoutGrid, ArrowUpDown, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,6 +91,7 @@ export default function ToolsManager() {
 
   const [newAttrKey, setNewAttrKey] = useState('');
   const [newAttrValue, setNewAttrValue] = useState('');
+  const [draggedAttrIndex, setDraggedAttrIndex] = useState<number | null>(null);
 
   // Filters
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -130,7 +131,7 @@ export default function ToolsManager() {
         calibrationDue: tool.calibrationDue || '',
         certificateNumber: t.certificateNumber || '',
         quantity: t.quantity || 1,
-          image: tool.image || null,
+        image: tool.image || null,
         customAttributes: { ...tool.customAttributes },
       });
     } else {
@@ -201,6 +202,29 @@ export default function ToolsManager() {
     const newAttrs = { ...formData.customAttributes };
     delete newAttrs[key];
     setFormData({ ...formData, customAttributes: newAttrs });
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedAttrIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedAttrIndex === null || draggedAttrIndex === dropIndex) return;
+
+    const entries = Object.entries(formData.customAttributes);
+    const [draggedEntry] = entries.splice(draggedAttrIndex, 1);
+    entries.splice(dropIndex, 0, draggedEntry);
+
+    const reorderedAttrs = Object.fromEntries(entries);
+    setFormData({ ...formData, customAttributes: reorderedAttrs });
+    setDraggedAttrIndex(null);
   };
 
   const getStatusBadgeVariant = (status: Tool['status']) => {
@@ -413,10 +437,13 @@ export default function ToolsManager() {
                   ) : (
                     <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                   )}
-                  {/* Show quantity only when > 0 */}
-                  {('quantity' in tool && (tool as ExtendedTool).quantity > 0) && (
-                    <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                  )}
+                  {/* Show quantity only when > 1 */}
+                  {(() => {
+                    const qty = (tool as ExtendedTool).quantity;
+                    return qty !== undefined && qty !== null && qty > 1;
+                  })() && (
+                      <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
+                    )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
@@ -436,9 +463,7 @@ export default function ToolsManager() {
                       <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
                     </p>
                   )}
-                  {('certificateNumber' in (tool as ExtendedTool)) && (tool as ExtendedTool).certificateNumber && (
-                    <p className="text-sm text-muted-foreground mt-2">Certificate N°: {(tool as ExtendedTool).certificateNumber}</p>
-                  )}
+
                 </div>
 
                 {/* Action buttons fixed to bottom */}
@@ -482,10 +507,51 @@ export default function ToolsManager() {
                         <h3 className="font-semibold text-lg">{tool.name}</h3>
                         <div className="flex gap-2 mt-1">
                           <Badge variant="outline">{tool.category}</Badge>
-                          <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                          {('quantity' in tool && (tool as ExtendedTool).quantity) && (
-                            <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
+                          {tool.status === 'In Use' ? (
+                            (() => {
+                              // Build assignment breakdown for this tool
+                              const entries: Array<{ projectName: string; qty: number }> = [];
+                              assignments.forEach(asg => {
+                                asg.tools.forEach(t => {
+                                  if (t.id === tool.id && (t.quantity || 1) > 0) {
+                                    entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+                                  }
+                                });
+                              });
+
+                              const hasEntries = entries.length > 0;
+
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span>
+                                      <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                                    </span>
+                                  </TooltipTrigger>
+                                  {hasEntries && (
+                                    <TooltipContent>
+                                      <div className="space-y-1">
+                                        {entries.map((e, i) => (
+                                          <div key={i} className="text-sm">
+                                            <strong>{e.projectName}</strong>: {e.qty}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              );
+                            })()
+                          ) : (
+                            <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                           )}
+                          {/* Show quantity only when > 1 */}
+                          {(() => {
+                            const qty = (tool as ExtendedTool).quantity;
+                            return qty !== undefined && qty !== null && qty > 1;
+                          })() && (
+                              <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
+                            )}
                         </div>
                       </div>
 
@@ -522,9 +588,7 @@ export default function ToolsManager() {
                         <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
                       </p>
                     )}
-                    {('certificateNumber' in (tool as ExtendedTool)) && (tool as ExtendedTool).certificateNumber && (
-                      <p className="text-sm text-muted-foreground mt-2">Certificate N°: {(tool as ExtendedTool).certificateNumber}</p>
-                    )}
+
                   </div>
                 </div>
               </CardContent>
@@ -601,7 +665,10 @@ export default function ToolsManager() {
                       className="h-11 w-full max-w-xs"
                     />
                   </div>
-                  {formData.isCalibrable && (
+                </div>
+
+                {formData.isCalibrable && (
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-semibold">Calibration Due Date</Label>
                       <Input
@@ -610,6 +677,8 @@ export default function ToolsManager() {
                         onChange={(e) => setFormData({ ...formData, calibrationDue: e.target.value })}
                         className="h-11"
                       />
+                    </div>
+                    <div className="space-y-2">
                       <Label className="text-sm font-semibold">Certificate N°</Label>
                       <Input
                         value={formData.certificateNumber}
@@ -618,8 +687,11 @@ export default function ToolsManager() {
                         className="h-11"
                       />
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
 
                 <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
                   <Checkbox
@@ -647,8 +719,18 @@ export default function ToolsManager() {
                 </div>
 
                 <div className="space-y-3">
-                  {Object.entries(formData.customAttributes).map(([key, value]) => (
-                    <div key={key} className="flex gap-3 items-center p-3 bg-muted/30 rounded-lg">
+                  {Object.entries(formData.customAttributes).map(([key, value], index) => (
+                    <div
+                      key={key}
+                      className="flex gap-3 items-center p-3 bg-muted/30 rounded-lg cursor-move hover:bg-muted/40 transition-colors"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                    >
+                      <div className="cursor-grab active:cursor-grabbing">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                      </div>
                       <div className="flex-1 grid grid-cols-2 gap-3">
                         <Input value={key} disabled className="font-medium bg-background" />
                         <Input value={value} disabled className="bg-background" />
