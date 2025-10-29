@@ -28,7 +28,11 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   // Checkout date (YYYY-MM-DD) defaulting to today
   const [checkoutDate, setCheckoutDate] = useState<string>(() => {
     const d = new Date();
-    return d.toISOString().slice(0, 10);
+    // Use local date to avoid timezone issues
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
 
   // Treat a tool as available if its status is 'Available' OR it is 'In Use' but still has quantity left
@@ -95,9 +99,12 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const handleComplete = async () => {
     if (selectedWorker && selectedProject && selectedTools.length > 0) {
       try {
+        // Fix timezone issue by creating date at noon to avoid timezone shifts
+        const [year, month, day] = checkoutDate.split('-').map(Number);
+        const checkoutDateTime = new Date(year, month - 1, day, 12, 0, 0);
+        
         await createAssignment({
-          // convert selected yyyy-mm-dd to full ISO so backend receives a timestamp
-          checkoutDate: new Date(checkoutDate).toISOString(),
+          checkoutDate: checkoutDateTime.toISOString(),
           worker: selectedWorker,
           project: selectedProject,
           tools: selectedTools,
@@ -236,7 +243,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                             </div>
                                         <div className="flex items-center space-x-2">
                                           <Checkbox checked={isSelected} />
-                                          {isSelected && (
+                                          {isSelected && (tool.quantity || 1) > 1 && (
                                             <div className="relative">
                                               <Label htmlFor={`quantity-${tool.id}`} className="sr-only">Quantity for {tool.name}</Label>
                                               <input
@@ -457,7 +464,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                     type="date"
                     value={checkoutDate}
                     onChange={(e) => setCheckoutDate(e.target.value)}
-                    className="max-w-xs h-11 pr-1"
+                    className="w-auto h-11 max-w-[200px]"
                   />
                 </div>
               </div>

@@ -31,7 +31,7 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
 
   const handleNavigation = (page: string) => {
     onNavigate(page);
-    
+
     // Auto-collapse behavior based on screen size
     if (isMobile) {
       // On mobile: close the overlay sidebar
