@@ -205,6 +205,7 @@ class ApiClient {
   }
 
   async checkinAssignment(id: number, data: {
+    checkinDate?: string;
     checkinNotes?: string;
     toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>;
   }): Promise<Assignment> {

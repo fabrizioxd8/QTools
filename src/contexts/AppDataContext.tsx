@@ -54,7 +54,7 @@ interface AppDataContextType {
   updateProject: (id: number, project: Partial<Project>) => void;
   deleteProject: (id: number) => void;
   createAssignment: (assignment: Omit<Assignment, 'id' | 'status'>) => void;
-  checkInAssignment: (id: number, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>) => void;
+  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -222,11 +222,21 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const checkInAssignment = async (
     id: number,
+    checkinDate?: string,
     checkinNotes?: string,
     toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>
   ) => {
     try {
+      // Fix timezone issue by creating date at noon to avoid timezone shifts
+      let checkinDateTime: string | undefined;
+      if (checkinDate) {
+        const [year, month, day] = checkinDate.split('-').map(Number);
+        const dateTime = new Date(year, month - 1, day, 12, 0, 0);
+        checkinDateTime = dateTime.toISOString();
+      }
+
       const updatedAssignment = await apiClient.checkinAssignment(id, {
+        checkinDate: checkinDateTime,
         checkinNotes,
         toolConditions
       });
