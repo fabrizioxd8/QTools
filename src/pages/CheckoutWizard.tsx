@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder, Wrench } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,11 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const [toolSearch, setToolSearch] = useState('');
   const [workerSearch, setWorkerSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
+
+  // Search input refs
+  const toolSearchInputRef = useRef<HTMLInputElement>(null);
+  const workerSearchInputRef = useRef<HTMLInputElement>(null);
+  const projectSearchInputRef = useRef<HTMLInputElement>(null);
   // Checkout date (YYYY-MM-DD) defaulting to today
   const [checkoutDate, setCheckoutDate] = useState<string>(() => {
     const d = new Date();
@@ -102,7 +107,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
         // Fix timezone issue by creating date at noon to avoid timezone shifts
         const [year, month, day] = checkoutDate.split('-').map(Number);
         const checkoutDateTime = new Date(year, month - 1, day, 12, 0, 0);
-        
+
         await createAssignment({
           checkoutDate: checkoutDateTime.toISOString(),
           worker: selectedWorker,
@@ -139,6 +144,27 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
 
     return () => clearTimeout(timeout);
   }, []);
+
+  // Handle Ctrl+F to focus search bar based on current step
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.key === 'f') {
+        event.preventDefault();
+        if (currentStep === 1) {
+          toolSearchInputRef.current?.focus();
+        } else if (currentStep === 2) {
+          workerSearchInputRef.current?.focus();
+        } else if (currentStep === 3) {
+          projectSearchInputRef.current?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentStep]);
 
   if (isLoading && showLoading) {
     return (
@@ -210,7 +236,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search tools..."
+                  ref={toolSearchInputRef}
+                  placeholder="Search tools... (Ctrl+F)"
                   value={toolSearch}
                   onChange={(e) => setToolSearch(e.target.value)}
                   className="pl-8"
@@ -241,29 +268,29 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                                 ))}
                               </div>
                             </div>
-                                        <div className="flex items-center space-x-2">
-                                          <Checkbox checked={isSelected} />
-                                          {isSelected && (tool.quantity || 1) > 1 && (
-                                            <div className="relative">
-                                              <Label htmlFor={`quantity-${tool.id}`} className="sr-only">Quantity for {tool.name}</Label>
-                                              <input
-                                                id={`quantity-${tool.id}`}
-                                                type="number"
-                                                min={1}
-                                                max={tool.quantity || 1}
-                                                value={selectedTools.find(t => t.id === tool.id)?.quantity || 1}
-                                                onChange={(e) => {
-                                                  const max = tool.quantity || 1;
-                                                  let v = Math.max(1, Number(e.target.value || 1));
-                                                  if (v > max) v = max;
-                                                  updateSelectedToolQuantity(tool.id, v);
-                                                }}
-                                                className="h-8 w-16 text-sm rounded border px-2"
-                                                onClick={(e) => e.stopPropagation()}
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
+                            <div className="flex items-center space-x-2">
+                              <Checkbox checked={isSelected} />
+                              {isSelected && (tool.quantity || 1) > 1 && (
+                                <div className="relative">
+                                  <Label htmlFor={`quantity-${tool.id}`} className="sr-only">Quantity for {tool.name}</Label>
+                                  <input
+                                    id={`quantity-${tool.id}`}
+                                    type="number"
+                                    min={1}
+                                    max={tool.quantity || 1}
+                                    value={selectedTools.find(t => t.id === tool.id)?.quantity || 1}
+                                    onChange={(e) => {
+                                      const max = tool.quantity || 1;
+                                      let v = Math.max(1, Number(e.target.value || 1));
+                                      if (v > max) v = max;
+                                      updateSelectedToolQuantity(tool.id, v);
+                                    }}
+                                    className="h-8 w-16 text-sm rounded border px-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </CardHeader>
                       </Card>
@@ -287,7 +314,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search workers..."
+                  ref={workerSearchInputRef}
+                  placeholder="Search workers... (Ctrl+F)"
                   value={workerSearch}
                   onChange={(e) => setWorkerSearch(e.target.value)}
                   className="pl-8"
@@ -347,7 +375,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search projects..."
+                  ref={projectSearchInputRef}
+                  placeholder="Search projects... (Ctrl+F)"
                   value={projectSearch}
                   onChange={(e) => setProjectSearch(e.target.value)}
                   className="pl-8"
@@ -476,10 +505,10 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
       {/* Navigation */}
       <div
         className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 transition-all duration-200 ease-in-out shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1),0_-2px_4px_-1px_rgba(0,0,0,0.06)] ${isMobile
-            ? 'left-0'
-            : state === 'collapsed'
-              ? 'left-12'
-              : 'left-64'
+          ? 'left-0'
+          : state === 'collapsed'
+            ? 'left-12'
+            : 'left-64'
           }`}
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center px-2">

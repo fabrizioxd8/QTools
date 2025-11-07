@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Search, ArrowUpDown, Folder, Wrench, User, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,12 @@ export default function WorkersProjects() {
   const toggleProjectExpand = (id: number) => {
     setExpandedProjectIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   };
-  
+
+  // Search input refs
+  const workerSearchInputRef = useRef<HTMLInputElement>(null);
+  const projectSearchInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<'workers' | 'projects'>('workers');
+
   // Worker state
   const [isWorkerDialogOpen, setIsWorkerDialogOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
@@ -52,7 +57,7 @@ export default function WorkersProjects() {
   const [workerSearch, setWorkerSearch] = useState('');
   const [deleteWorkerConfirm, setDeleteWorkerConfirm] = useState<number | null>(null);
 
-  
+
   // Project state
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -134,7 +139,7 @@ export default function WorkersProjects() {
         await addWorker(workerFormData);
         toast.success('Worker added successfully');
       }
-      
+
       setIsWorkerDialogOpen(false);
     } catch (error) {
       toast.error('Failed to save worker. Please try again.');
@@ -179,7 +184,7 @@ export default function WorkersProjects() {
         await addProject(projectFormData);
         toast.success('Project added successfully');
       }
-      
+
       setIsProjectDialogOpen(false);
     } catch (error) {
       toast.error('Failed to save project. Please try again.');
@@ -218,9 +223,9 @@ export default function WorkersProjects() {
     });
 
     projectSet.forEach((projects, workerId) => {
-        const currentStats = stats.get(workerId) || { projectCount: 0, toolCount: 0 };
-        currentStats.projectCount = projects.size;
-        stats.set(workerId, currentStats);
+      const currentStats = stats.get(workerId) || { projectCount: 0, toolCount: 0 };
+      currentStats.projectCount = projects.size;
+      stats.set(workerId, currentStats);
     });
 
     return stats;
@@ -236,7 +241,7 @@ export default function WorkersProjects() {
       sortableWorkers.sort((a, b) => {
         const aValue = a[workerSortField];
         const bValue = b[workerSortField];
-        
+
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           const aLower = aValue.toLowerCase();
           const bLower = bValue.toLowerCase();
@@ -259,17 +264,36 @@ export default function WorkersProjects() {
     .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
     .sort((a, b) => {
       if (!projectSortField) return 0;
-      
+
       let aValue = a[projectSortField];
       let bValue = b[projectSortField];
-      
+
       if (typeof aValue === 'string') aValue = aValue.toLowerCase();
       if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-      
+
       if (aValue < bValue) return projectSortDirection === 'asc' ? -1 : 1;
       if (aValue > bValue) return projectSortDirection === 'asc' ? 1 : -1;
       return 0;
     });
+
+  // Handle Ctrl+F to focus search bar based on active tab
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.key === 'f') {
+        event.preventDefault();
+        if (activeTab === 'workers') {
+          workerSearchInputRef.current?.focus();
+        } else {
+          projectSearchInputRef.current?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeTab]);
 
   return (
     <div className="space-y-6">
@@ -278,7 +302,7 @@ export default function WorkersProjects() {
         <p className="text-muted-foreground">Manage workers and projects</p>
       </div>
 
-      <Tabs defaultValue="workers" className="space-y-4">
+      <Tabs defaultValue="workers" className="space-y-4" onValueChange={(value) => setActiveTab(value as 'workers' | 'projects')}>
         <TabsList>
           <TabsTrigger value="workers">Workers</TabsTrigger>
           <TabsTrigger value="projects">Projects</TabsTrigger>
@@ -301,114 +325,115 @@ export default function WorkersProjects() {
                 <div className="relative flex-1">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search workers..."
+                    ref={workerSearchInputRef}
+                    placeholder="Search workers... (Ctrl+F)"
                     value={workerSearch}
                     onChange={(e) => setWorkerSearch(e.target.value)}
                     className="pl-8"
                   />
                 </div>
-                
+
 
               </div>
-              
+
               {sortedAndFilteredWorkers.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No workers found</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>
-                        <Button
-                          variant="ghost"
-                          className="h-auto p-0 font-semibold hover:bg-transparent"
-                          onClick={() => handleWorkerSort('name')}
-                        >
-                          Name
-                          {(() => {
-                            const Icon = getWorkerSortIcon('name');
-                            return <Icon className="ml-2 h-4 w-4" />;
-                          })()}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="hidden md:table-cell">Employee ID</TableHead>
-                      <TableHead className="hidden md:table-cell">Assigned Projects</TableHead>
-                      <TableHead className="hidden md:table-cell">Assigned Tools</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedAndFilteredWorkers.map(worker => (
-                      <>
-                        <TableRow key={worker.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <User className="h-4 w-4 text-primary" />
-                            </div>
-                              <div className="min-w-0">
-                                <button
-                                  className="flex items-center text-left w-full truncate md:cursor-auto"
-                                  onClick={() => toggleWorkerExpand(worker.id)}
-                                  aria-expanded={!!expandedWorkerIds.includes(worker.id)}
-                                  aria-controls={expandedWorkerIds.includes(worker.id) ? `details-${worker.id}` : undefined}
-                                >
-                                  <span className="block truncate">{worker.name}</span>
-                                  <span
-                                    className={`ml-2 inline-block md:hidden transform transition-transform duration-150 ${expandedWorkerIds.includes(worker.id) ? 'rotate-180' : ''}`}
-                                    aria-hidden
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          <Button
+                            variant="ghost"
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                            onClick={() => handleWorkerSort('name')}
+                          >
+                            Name
+                            {(() => {
+                              const Icon = getWorkerSortIcon('name');
+                              return <Icon className="ml-2 h-4 w-4" />;
+                            })()}
+                          </Button>
+                        </TableHead>
+                        <TableHead className="hidden md:table-cell">Employee ID</TableHead>
+                        <TableHead className="hidden md:table-cell">Assigned Projects</TableHead>
+                        <TableHead className="hidden md:table-cell">Assigned Tools</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedAndFilteredWorkers.map(worker => (
+                        <>
+                          <TableRow key={worker.id} className="hover:bg-muted/50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <User className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="min-w-0">
+                                  <button
+                                    className="flex items-center text-left w-full truncate md:cursor-auto"
+                                    onClick={() => toggleWorkerExpand(worker.id)}
+                                    aria-expanded={!!expandedWorkerIds.includes(worker.id)}
+                                    aria-controls={expandedWorkerIds.includes(worker.id) ? `details-${worker.id}` : undefined}
                                   >
-                                    <ChevronDown className="h-4 w-4" />
-                                  </span>
-                                </button>
+                                    <span className="block truncate">{worker.name}</span>
+                                    <span
+                                      className={`ml-2 inline-block md:hidden transform transition-transform duration-150 ${expandedWorkerIds.includes(worker.id) ? 'rotate-180' : ''}`}
+                                      aria-hidden
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </span>
+                                  </button>
+                                </div>
                               </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">{worker.employeeId}</TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <div className="flex items-center gap-2">
-                            <Folder className="h-4 w-4 text-muted-foreground" /> {worker.projectCount}
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <div className="flex items-center gap-2">
-                            <Wrench className="h-4 w-4 text-muted-foreground" /> {worker.toolCount}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openWorkerDialog(worker)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteWorkerConfirm(worker.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        </TableRow>
-                        {/* Expandable details row for small screens */}
-                        {expandedWorkerIds.includes(worker.id) && (
-                          <TableRow id={`details-${worker.id}`}>
-                            <TableCell className="md:hidden" colSpan={5} role="region">
-                              <div className="space-y-2">
-                                <div className="text-sm"><strong>Employee ID:</strong> {worker.employeeId}</div>
-                                <div className="text-sm"><strong>Assigned Projects:</strong> {worker.projectCount}</div>
-                                <div className="text-sm"><strong>Assigned Tools:</strong> {worker.toolCount}</div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">{worker.employeeId}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <div className="flex items-center gap-2">
+                                <Folder className="h-4 w-4 text-muted-foreground" /> {worker.projectCount}
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <div className="flex items-center gap-2">
+                                <Wrench className="h-4 w-4 text-muted-foreground" /> {worker.toolCount}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openWorkerDialog(worker)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteWorkerConfirm(worker.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
-                        )}
-                      </>
-                    ))}
-                  </TableBody>
+                          {/* Expandable details row for small screens */}
+                          {expandedWorkerIds.includes(worker.id) && (
+                            <TableRow id={`details-${worker.id}`}>
+                              <TableCell className="md:hidden" colSpan={5} role="region">
+                                <div className="space-y-2">
+                                  <div className="text-sm"><strong>Employee ID:</strong> {worker.employeeId}</div>
+                                  <div className="text-sm"><strong>Assigned Projects:</strong> {worker.projectCount}</div>
+                                  <div className="text-sm"><strong>Assigned Tools:</strong> {worker.toolCount}</div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      ))}
+                    </TableBody>
                   </Table>
                 </div>
               )}
@@ -433,96 +458,97 @@ export default function WorkersProjects() {
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search projects..."
+                    ref={projectSearchInputRef}
+                    placeholder="Search projects... (Ctrl+F)"
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
                     className="pl-8"
                   />
                 </div>
               </div>
-              
+
               {filteredProjects.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No projects found</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>
-                        <Button
-                          variant="ghost"
-                          className="h-auto p-0 font-semibold hover:bg-transparent"
-                          onClick={() => handleProjectSort('name')}
-                        >
-                          Project Name
-                          {(() => {
-                            const Icon = getProjectSortIcon('name');
-                            return <Icon className="ml-2 h-4 w-4" />;
-                          })()}
-                        </Button>
-                      </TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredProjects.map(project => (
-                      <>
-                        <TableRow key={project.id} className="hover:bg-muted/50">
-                        <TableCell className="font-medium min-w-0">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center flex-shrink-0">
-                              <Folder className="h-4 w-4 text-secondary-foreground" />
-                            </div>
-                            <div className="min-w-0">
-                              <button
-                                className="flex items-center text-left w-full truncate md:cursor-auto"
-                                onClick={() => toggleProjectExpand(project.id)}
-                                aria-expanded={!!expandedProjectIds.includes(project.id)}
-                                aria-controls={expandedProjectIds.includes(project.id) ? `p-details-${project.id}` : undefined}
-                              >
-                                <span className="block truncate">{project.name}</span>
-                                <span
-                                  className={`ml-2 inline-block md:hidden transform transition-transform duration-150 ${expandedProjectIds.includes(project.id) ? 'rotate-180' : ''}`}
-                                  aria-hidden
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          <Button
+                            variant="ghost"
+                            className="h-auto p-0 font-semibold hover:bg-transparent"
+                            onClick={() => handleProjectSort('name')}
+                          >
+                            Project Name
+                            {(() => {
+                              const Icon = getProjectSortIcon('name');
+                              return <Icon className="ml-2 h-4 w-4" />;
+                            })()}
+                          </Button>
+                        </TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProjects.map(project => (
+                        <>
+                          <TableRow key={project.id} className="hover:bg-muted/50">
+                            <TableCell className="font-medium min-w-0">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-secondary/50 flex items-center justify-center flex-shrink-0">
+                                  <Folder className="h-4 w-4 text-secondary-foreground" />
+                                </div>
+                                <div className="min-w-0">
+                                  <button
+                                    className="flex items-center text-left w-full truncate md:cursor-auto"
+                                    onClick={() => toggleProjectExpand(project.id)}
+                                    aria-expanded={!!expandedProjectIds.includes(project.id)}
+                                    aria-controls={expandedProjectIds.includes(project.id) ? `p-details-${project.id}` : undefined}
+                                  >
+                                    <span className="block truncate">{project.name}</span>
+                                    <span
+                                      className={`ml-2 inline-block md:hidden transform transition-transform duration-150 ${expandedProjectIds.includes(project.id) ? 'rotate-180' : ''}`}
+                                      aria-hidden
+                                    >
+                                      <ChevronDown className="h-4 w-4" />
+                                    </span>
+                                  </button>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openProjectDialog(project)}
                                 >
-                                  <ChevronDown className="h-4 w-4" />
-                                </span>
-                              </button>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openProjectDialog(project)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteProjectConfirm(project.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        </TableRow>
-                        {expandedProjectIds.includes(project.id) && (
-                          <TableRow id={`p-details-${project.id}`}>
-                            <TableCell className="md:hidden" colSpan={2} role="region">
-                              <div className="space-y-2">
-                                <div className="text-sm"><strong>Project Name:</strong> {project.name}</div>
-                                {/* add more project details here if needed */}
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteProjectConfirm(project.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>
-                        )}
-                      </>
-                    ))}
-                  </TableBody>
+                          {expandedProjectIds.includes(project.id) && (
+                            <TableRow id={`p-details-${project.id}`}>
+                              <TableCell className="md:hidden" colSpan={2} role="region">
+                                <div className="space-y-2">
+                                  <div className="text-sm"><strong>Project Name:</strong> {project.name}</div>
+                                  {/* add more project details here if needed */}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      ))}
+                    </TableBody>
                   </Table>
                 </div>
               )}
@@ -540,7 +566,7 @@ export default function WorkersProjects() {
               {editingWorker ? 'Update worker information' : 'Add a new worker to your system'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Worker Name *</Label>
@@ -550,7 +576,7 @@ export default function WorkersProjects() {
                 placeholder="Enter worker name"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Employee ID *</Label>
               <Input
@@ -560,7 +586,7 @@ export default function WorkersProjects() {
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsWorkerDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleWorkerSubmit}>
@@ -579,7 +605,7 @@ export default function WorkersProjects() {
               {editingProject ? 'Update project information' : 'Add a new project to your system'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Project Name *</Label>
@@ -590,7 +616,7 @@ export default function WorkersProjects() {
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleProjectSubmit}>

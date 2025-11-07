@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +25,15 @@ export default function ActiveAssignments() {
   const [checkInDialog, setCheckInDialog] = useState<Assignment | null>(null);
   const [toolConditions, setToolConditions] = useState<Record<number, 'good' | 'damaged' | 'lost'>>({});
   const [checkinNotes, setCheckinNotes] = useState('');
+  // Check-in date (YYYY-MM-DD) defaulting to today
+  const [checkinDate, setCheckinDate] = useState<string>(() => {
+    const d = new Date();
+    // Use local date to avoid timezone issues
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
 
   const activeAssignments = assignments.filter(a => a.status === 'active');
   const completedAssignments = assignments.filter(a => a.status === 'completed');
@@ -49,12 +59,18 @@ export default function ActiveAssignments() {
     });
     setToolConditions(initialConditions);
     setCheckinNotes('');
+    // Reset check-in date to today when opening dialog
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setCheckinDate(`${year}-${month}-${day}`);
   };
 
   const handleCheckIn = async () => {
     if (checkInDialog) {
       try {
-        await checkInAssignment(checkInDialog.id, checkinNotes, toolConditions);
+        await checkInAssignment(checkInDialog.id, checkinDate, checkinNotes, toolConditions);
         toast.success('Tools checked in successfully!');
         setCheckInDialog(null);
         setCheckinNotes('');
@@ -396,14 +412,28 @@ export default function ActiveAssignments() {
                 </div>
               ))}
 
-              <div className="space-y-2">
-                <Label>Notes (Optional)</Label>
-                <Textarea
-                  placeholder="Add any additional notes about this check-in..."
-                  value={checkinNotes}
-                  onChange={(e) => setCheckinNotes(e.target.value)}
-                  rows={4}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Check-in Date</Label>
+                  <div className="flex items-center">
+                    <Input
+                      type="date"
+                      value={checkinDate}
+                      onChange={(e) => setCheckinDate(e.target.value)}
+                      className="w-auto h-11 max-w-[200px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notes (Optional)</Label>
+                  <Textarea
+                    placeholder="Add any additional notes about this check-in..."
+                    value={checkinNotes}
+                    onChange={(e) => setCheckinNotes(e.target.value)}
+                    rows={4}
+                  />
+                </div>
               </div>
             </div>
           )}
