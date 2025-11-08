@@ -729,6 +729,9 @@ export default function ToolsManager() {
                       onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) || 1 })}
                       className="h-11 w-full max-w-xs"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Total available quantity in inventory
+                    </p>
                   </div>
                 </div>
 

@@ -10,6 +10,7 @@ router.get('/', async (req, res) => {
       SELECT 
         a.id,
         a.checkoutDate,
+        a.checkoutNotes,
         a.checkinDate,
         a.status,
         a.checkinNotes,
@@ -56,6 +57,7 @@ router.get('/', async (req, res) => {
         return {
           id: assignment.id,
           checkoutDate: assignment.checkoutDate,
+          checkoutNotes: assignment.checkoutNotes,
           checkinDate: assignment.checkinDate,
           status: assignment.status,
           checkinNotes: assignment.checkinNotes,
@@ -84,7 +86,7 @@ router.get('/', async (req, res) => {
 // POST /api/assignments - Create new assignment (quantity-aware)
 router.post('/', async (req, res) => {
   try {
-    const { checkoutDate, workerId, projectId, tools } = req.body;
+    const { checkoutDate, checkoutNotes, workerId, projectId, tools } = req.body;
 
     if (!checkoutDate || !workerId || !projectId || !tools || !Array.isArray(tools)) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -103,9 +105,9 @@ router.post('/', async (req, res) => {
     try {
       // Create assignment
       const result = await runQuery(`
-        INSERT INTO assignments (checkoutDate, workerId, projectId, status)
-        VALUES (?, ?, ?, 'active')
-      `, [checkoutDate, workerId, projectId]);
+        INSERT INTO assignments (checkoutDate, checkoutNotes, workerId, projectId, status)
+        VALUES (?, ?, ?, ?, 'active')
+      `, [checkoutDate, checkoutNotes || null, workerId, projectId]);
 
       assignmentId = result.id;
 
@@ -143,6 +145,7 @@ router.post('/', async (req, res) => {
       SELECT 
         a.id,
         a.checkoutDate,
+        a.checkoutNotes,
         a.checkinDate,
         a.status,
         a.checkinNotes,
@@ -186,6 +189,7 @@ router.post('/', async (req, res) => {
     const completeAssignment = {
       id: assignment.id,
       checkoutDate: assignment.checkoutDate,
+      checkoutNotes: assignment.checkoutNotes,
       checkinDate: assignment.checkinDate,
       status: assignment.status,
       checkinNotes: assignment.checkinNotes,
@@ -212,8 +216,8 @@ router.post('/', async (req, res) => {
 // PUT /api/assignments/:id/checkin - Check in assignment
 router.put('/:id/checkin', async (req, res) => {
   try {
-    const { checkinNotes, toolConditions } = req.body;
-    const checkinDate = new Date().toISOString();
+    const { checkinDate, checkinNotes, toolConditions } = req.body;
+    const finalCheckinDate = checkinDate || new Date().toISOString();
 
     // Start transaction for atomic checkin
     await runQuery('BEGIN TRANSACTION');
@@ -223,7 +227,7 @@ router.put('/:id/checkin', async (req, res) => {
         UPDATE assignments
         SET checkinDate = ?, status = 'completed', checkinNotes = ?, toolConditions = ?
         WHERE id = ?
-      `, [checkinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), req.params.id]);
+      `, [finalCheckinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), req.params.id]);
 
       // Update tool statuses based on conditions (damaged/lost override)
       const damagedOrLost = new Set();
@@ -264,6 +268,7 @@ router.put('/:id/checkin', async (req, res) => {
       SELECT 
         a.id,
         a.checkoutDate,
+        a.checkoutNotes,
         a.checkinDate,
         a.status,
         a.checkinNotes,
@@ -307,6 +312,7 @@ router.put('/:id/checkin', async (req, res) => {
     const completeAssignment = {
       id: assignment.id,
       checkoutDate: assignment.checkoutDate,
+      checkoutNotes: assignment.checkoutNotes,
       checkinDate: assignment.checkinDate,
       status: assignment.status,
       checkinNotes: assignment.checkinNotes,

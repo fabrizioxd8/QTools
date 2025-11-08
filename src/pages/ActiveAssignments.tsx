@@ -35,8 +35,18 @@ export default function ActiveAssignments() {
     return `${year}-${month}-${day}`;
   });
 
-  const activeAssignments = assignments.filter(a => a.status === 'active');
-  const completedAssignments = assignments.filter(a => a.status === 'completed');
+  const activeAssignments = assignments
+    .filter(a => a.status === 'active')
+    .sort((a, b) => new Date(b.checkoutDate).getTime() - new Date(a.checkoutDate).getTime());
+
+  const completedAssignments = assignments
+    .filter(a => a.status === 'completed')
+    .sort((a, b) => {
+      // Sort by check-in date DESC (most recent first)
+      const aDate = a.checkinDate ? new Date(a.checkinDate).getTime() : 0;
+      const bDate = b.checkinDate ? new Date(b.checkinDate).getTime() : 0;
+      return bDate - aDate;
+    });
 
   const getDaysOut = (checkoutDate: string) => {
     const today = new Date();
@@ -198,16 +208,25 @@ export default function ActiveAssignments() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div>
-                        <p className="font-semibold mb-2">Tools ({assignment.tools.length}):</p>
-                        <div className="flex flex-wrap gap-2">
-                          {assignment.tools.map(tool => (
-                            <Badge key={tool.id} variant="outline">
-                              {tool.name}
-                              {tool.quantity && tool.quantity > 1 && ` (${tool.quantity})`}
-                            </Badge>
-                          ))}
+                      <div className="space-y-3">
+                        <div>
+                          <p className="font-semibold mb-2">Tools ({assignment.tools.length}):</p>
+                          <div className="flex flex-wrap gap-2">
+                            {assignment.tools.map(tool => (
+                              <Badge key={tool.id} variant="outline">
+                                {tool.name}
+                                {tool.quantity && tool.quantity > 1 && ` (${tool.quantity})`}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
+
+                        {assignment.checkoutNotes && (
+                          <div>
+                            <p className="font-semibold mb-1">Checkout Notes:</p>
+                            <p className="text-sm text-muted-foreground">{assignment.checkoutNotes}</p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -319,9 +338,16 @@ export default function ActiveAssignments() {
                           </div>
                         </div>
 
+                        {assignment.checkoutNotes && (
+                          <div>
+                            <p className="font-semibold mb-1">Checkout Notes:</p>
+                            <p className="text-sm text-muted-foreground">{assignment.checkoutNotes}</p>
+                          </div>
+                        )}
+
                         {assignment.checkinNotes && (
                           <div>
-                            <p className="font-semibold mb-1">Notes:</p>
+                            <p className="font-semibold mb-1">Check-in Notes:</p>
                             <p className="text-sm text-muted-foreground">{assignment.checkinNotes}</p>
                           </div>
                         )}
