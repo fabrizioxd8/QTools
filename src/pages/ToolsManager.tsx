@@ -47,6 +47,7 @@ export default function ToolsManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Layout controls
@@ -149,12 +150,40 @@ export default function ToolsManager() {
         customAttributes: {},
       });
     }
+    // Clear custom attribute input fields
+    setNewAttrKey('');
+    setNewAttrValue('');
     setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    // Check if there are unsaved custom attributes
+    if (newAttrKey.trim() || newAttrValue.trim()) {
+      setShowUnsavedWarning(true);
+      return;
+    }
+    setIsDialogOpen(false);
+    // Clear custom attribute input fields when closing
+    setNewAttrKey('');
+    setNewAttrValue('');
+  };
+
+  const confirmCloseDialog = () => {
+    setShowUnsavedWarning(false);
+    setIsDialogOpen(false);
+    setNewAttrKey('');
+    setNewAttrValue('');
   };
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.category) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+
+    // Check if there are unsaved custom attributes
+    if (newAttrKey.trim() || newAttrValue.trim()) {
+      toast.error('Please add or clear the custom attribute fields before saving');
       return;
     }
 
@@ -168,10 +197,29 @@ export default function ToolsManager() {
       }
 
       setIsDialogOpen(false);
+      // Clear custom attribute input fields
+      setNewAttrKey('');
+      setNewAttrValue('');
     } catch (error) {
       toast.error('Failed to save tool. Please try again.');
       console.error('Error saving tool:', error);
     }
+  };
+
+  const isToolAssigned = (toolId: number): boolean => {
+    return assignments.some(assignment =>
+      assignment.status === 'active' &&
+      assignment.tools.some(tool => tool.id === toolId)
+    );
+  };
+
+  const handleDeleteAttempt = (id: number) => {
+    // Check if tool is assigned to any active assignment
+    if (isToolAssigned(id)) {
+      toast.error('Cannot delete tool that is currently assigned to an active project');
+      return;
+    }
+    setDeleteConfirmId(id);
   };
 
   const handleDelete = async (id: number) => {
@@ -492,7 +540,7 @@ export default function ToolsManager() {
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => setDeleteConfirmId(tool.id)}
+                    onClick={() => handleDeleteAttempt(tool.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -581,7 +629,7 @@ export default function ToolsManager() {
                         <Button
                           variant="destructive"
                           size="sm"
-                          onClick={() => setDeleteConfirmId(tool.id)}
+                          onClick={() => handleDeleteAttempt(tool.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -615,7 +663,7 @@ export default function ToolsManager() {
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); else setIsDialogOpen(true); }}>
         <DialogContent
           className="max-w-4xl max-h-[90vh] overflow-y-auto"
           onInteractOutside={(e) => e.preventDefault()}
@@ -809,7 +857,7 @@ export default function ToolsManager() {
             </div>
           </div>
           <DialogFooter className="pt-6 border-t">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="px-6">
+            <Button variant="outline" onClick={closeDialog} className="px-6">
               Cancel
             </Button>
             <Button onClick={handleSubmit} className="px-6">
@@ -832,6 +880,24 @@ export default function ToolsManager() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved Custom Attributes Warning */}
+      <AlertDialog open={showUnsavedWarning} onOpenChange={setShowUnsavedWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Custom Attributes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved custom attributes. Are you sure you want to close without adding them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCloseDialog}>
+              Close Without Saving
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
