@@ -194,6 +194,7 @@ class ApiClient {
 
   async createAssignment(assignment: {
     checkoutDate: string;
+    checkoutNotes?: string;
     workerId: number;
     projectId: number;
     tools: { toolId: number; quantity: number }[];

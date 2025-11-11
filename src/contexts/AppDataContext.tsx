@@ -29,6 +29,7 @@ export interface Project {
 export interface Assignment {
   id: number;
   checkoutDate: string;
+  checkoutNotes?: string;
   worker: Worker;
   project: Project;
   tools: Tool[];
@@ -114,11 +115,13 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const updated = await apiClient.updateTool(id, updatedTool);
       setTools(tools.map(tool => tool.id === id ? updated : tool));
 
-      // Update tools in active assignments
+      // Update tools in active assignments (but preserve assignment-specific fields like quantity)
+      // Only update display fields like name, category, status, etc.
+      const { quantity, ...displayUpdates } = updatedTool;
       setAssignments(assignments.map(assignment => ({
         ...assignment,
         tools: assignment.tools.map(tool =>
-          tool.id === id ? { ...tool, ...updatedTool } : tool
+          tool.id === id ? { ...tool, ...displayUpdates } : tool
         )
       })));
     } catch (error) {
@@ -203,13 +206,15 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const toolsPayload = assignment.tools.map(tool => ({ toolId: tool.id, quantity: tool.quantity || 1 }));
       const assignmentData = {
         checkoutDate: assignment.checkoutDate,
+        checkoutNotes: assignment.checkoutNotes,
         workerId: assignment.worker.id,
         projectId: assignment.project.id,
         tools: toolsPayload
       };
 
       const newAssignment = await apiClient.createAssignment(assignmentData);
-      setAssignments([...assignments, newAssignment]);
+      // Add new assignment at the beginning to maintain DESC order (newest first)
+      setAssignments([newAssignment, ...assignments]);
 
       // Refresh tools to get updated statuses
       const updatedTools = await apiClient.getTools();

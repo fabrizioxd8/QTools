@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 interface CheckoutWizardProps {
   onNavigate?: (page: string) => void;
 }
@@ -25,6 +26,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const [toolSearch, setToolSearch] = useState('');
   const [workerSearch, setWorkerSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
+  const [checkoutNotes, setCheckoutNotes] = useState('');
 
   // Search input refs
   const toolSearchInputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +112,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
 
         await createAssignment({
           checkoutDate: checkoutDateTime.toISOString(),
+          checkoutNotes: checkoutNotes.trim() || undefined,
           worker: selectedWorker,
           project: selectedProject,
           tools: selectedTools,
@@ -122,6 +125,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
         setSelectedTools([]);
         setSelectedWorker(null);
         setSelectedProject(null);
+        setCheckoutNotes('');
 
         // Navigate to assignments
         onNavigate?.('assignments');
@@ -497,6 +501,20 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                   />
                 </div>
               </div>
+
+              <div>
+                <h3 className="font-semibold mb-2">Notes (Optional)</h3>
+                <Textarea
+                  placeholder="Add any notes or comments about this checkout..."
+                  value={checkoutNotes}
+                  onChange={(e) => setCheckoutNotes(e.target.value)}
+                  rows={4}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Add any relevant information about this assignment
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -515,7 +533,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
           {currentStep === 1 && selectedTools.length > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <Wrench className="h-5 w-5 text-primary" />
-              <span className="font-bold">{selectedTools.length}</span> tool{selectedTools.length > 1 ? 's' : ''} selected
+              <span className="font-bold">{selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0)}</span> tool{selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0) > 1 ? 's' : ''} selected
             </div>
           )}
           {currentStep > 1 && (
