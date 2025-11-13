@@ -36,7 +36,7 @@ export interface Assignment {
   checkinDate?: string;
   status: 'active' | 'completed';
   checkinNotes?: string;
-  toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>;
+  toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>;
 }
 
 interface AppDataContextType {
@@ -55,7 +55,7 @@ interface AppDataContextType {
   updateProject: (id: number, project: Partial<Project>) => void;
   deleteProject: (id: number) => void;
   createAssignment: (assignment: Omit<Assignment, 'id' | 'status'>) => void;
-  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>) => void;
+  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -229,7 +229,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     id: number,
     checkinDate?: string,
     checkinNotes?: string,
-    toolConditions?: Record<number, 'good' | 'damaged' | 'lost'>
+    toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>
   ) => {
     try {
       // Fix timezone issue by creating date at noon to avoid timezone shifts
