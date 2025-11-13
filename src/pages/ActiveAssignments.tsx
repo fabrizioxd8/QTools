@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, User, Folder, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, User, Folder, AlertCircle, CheckCircle, XCircle, Clock, Edit } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,8 @@ import { toast } from 'sonner';
 export default function ActiveAssignments() {
   const { assignments, checkInAssignment } = useAppData();
   const [checkInDialog, setCheckInDialog] = useState<Assignment | null>(null);
-  const [toolConditions, setToolConditions] = useState<Record<number, 'good' | 'damaged' | 'lost'>>({});
+  const [toolConditions, setToolConditions] = useState<Record<number, 'good' | 'damaged' | 'lost' | 'missing'>>({});
+  const [editingCompletedAssignment, setEditingCompletedAssignment] = useState<Assignment | null>(null);
   const [checkinNotes, setCheckinNotes] = useState('');
   // Check-in date (YYYY-MM-DD) defaulting to today
   const [checkinDate, setCheckinDate] = useState<string>(() => {
@@ -92,15 +93,31 @@ export default function ActiveAssignments() {
     }
   };
 
-  const getConditionIcon = (condition: 'good' | 'damaged' | 'lost') => {
+  const handleEditCheckIn = async () => {
+    if (editingCompletedAssignment) {
+      try {
+        await checkInAssignment(editingCompletedAssignment.id, checkinDate, checkinNotes, toolConditions);
+        toast.success('Check-in updated successfully!');
+        setEditingCompletedAssignment(null);
+        setCheckinNotes('');
+        setToolConditions({});
+      } catch (error) {
+        toast.error('Failed to update check-in. Please try again.');
+        console.error('Error updating check-in:', error);
+      }
+    }
+  };
+
+  const getConditionIcon = (condition: 'good' | 'damaged' | 'lost' | 'missing') => {
     switch (condition) {
       case 'good': return CheckCircle;
       case 'damaged': return AlertCircle;
       case 'lost': return XCircle;
+      case 'missing': return Clock;
     }
   };
 
-  const getConditionBadgeClass = (condition: 'good' | 'damaged' | 'lost') => {
+  const getConditionBadgeClass = (condition: 'good' | 'damaged' | 'lost' | 'missing') => {
     switch (condition) {
       case 'good':
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200/60 dark:border-green-700/40';
@@ -108,6 +125,8 @@ export default function ActiveAssignments() {
         return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border-red-200/60 dark:border-red-700/40';
       case 'lost':
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400 border-gray-200/60 dark:border-gray-700/40';
+      case 'missing':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200/60 dark:border-yellow-700/40';
       default:
         return 'bg-secondary text-secondary-foreground';
     }
@@ -296,27 +315,48 @@ export default function ActiveAssignments() {
                 return (
                   <Card key={assignment.id}>
                     <CardHeader>
-                      <div className="space-y-1">
-                        <Badge>Assignment #{assignment.id}</Badge>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            Out: {new Date(assignment.checkoutDate).toLocaleDateString()}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            In: {assignment.checkinDate && new Date(assignment.checkinDate).toLocaleDateString()}
-                          </div>
-                          <Badge variant="outline">{duration} days</Badge>
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4" />
-                            {assignment.worker.name}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Folder className="h-4 w-4" />
-                            {assignment.project.name}
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1 flex-1">
+                          <Badge>Assignment #{assignment.id}</Badge>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              Out: {new Date(assignment.checkoutDate).toLocaleDateString()}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              In: {assignment.checkinDate && new Date(assignment.checkinDate).toLocaleDateString()}
+                            </div>
+                            <Badge variant="outline">{duration} days</Badge>
+                            <div className="flex items-center gap-1">
+                              <User className="h-4 w-4" />
+                              {assignment.worker.name}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Folder className="h-4 w-4" />
+                              {assignment.project.name}
+                            </div>
                           </div>
                         </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingCompletedAssignment(assignment);
+                            setToolConditions(assignment.toolConditions || {});
+                            setCheckinNotes(assignment.checkinNotes || '');
+                            if (assignment.checkinDate) {
+                              const date = new Date(assignment.checkinDate);
+                              const year = date.getFullYear();
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              setCheckinDate(`${year}-${month}-${day}`);
+                            }
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Check-In
+                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -387,53 +427,45 @@ export default function ActiveAssignments() {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${tool.id}-status-change`}
-                        checked={toolConditions[tool.id] === 'good'}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setToolConditions({ ...toolConditions, [tool.id]: 'good' });
-                          } else {
-                            setToolConditions({ ...toolConditions, [tool.id]: 'damaged' });
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`${tool.id}-status-change`} className="cursor-pointer flex items-center">
-                        <CheckCircle className="mr-1 h-4 w-4 text-success" />
-                        Tool is in good condition
-                      </Label>
-                    </div>
-
-                    {toolConditions[tool.id] !== 'good' && (
-                      <div className="ml-6 space-y-2">
-                        <p className="text-sm font-medium text-muted-foreground">Select condition:</p>
-                        <RadioGroup
-                          value={toolConditions[tool.id]}
-                          onValueChange={(value: 'damaged' | 'lost') =>
-                            setToolConditions({ ...toolConditions, [tool.id]: value })
-                          }
-                        >
-                          <div className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="damaged" id={`${tool.id}-damaged`} />
-                              <Label htmlFor={`${tool.id}-damaged`} className="cursor-pointer flex items-center">
-                                <AlertCircle className="mr-1 h-4 w-4 text-warning" />
-                                Damaged
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="lost" id={`${tool.id}-lost`} />
-                              <Label htmlFor={`${tool.id}-lost`} className="cursor-pointer flex items-center">
-                                <XCircle className="mr-1 h-4 w-4 text-destructive" />
-                                Lost
-                              </Label>
-                            </div>
-                          </div>
-                        </RadioGroup>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">Tool Condition:</Label>
+                    <RadioGroup
+                      value={toolConditions[tool.id] || 'good'}
+                      onValueChange={(value: 'good' | 'damaged' | 'lost' | 'missing') =>
+                        setToolConditions({ ...toolConditions, [tool.id]: value })
+                      }
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="good" id={`${tool.id}-good`} />
+                          <Label htmlFor={`${tool.id}-good`} className="cursor-pointer flex items-center font-normal">
+                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                            Returned in good condition
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="missing" id={`${tool.id}-missing`} />
+                          <Label htmlFor={`${tool.id}-missing`} className="cursor-pointer flex items-center font-normal">
+                            <Clock className="mr-2 h-4 w-4 text-yellow-600" />
+                            Missing / Not returned yet
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="damaged" id={`${tool.id}-damaged`} />
+                          <Label htmlFor={`${tool.id}-damaged`} className="cursor-pointer flex items-center font-normal">
+                            <AlertCircle className="mr-2 h-4 w-4 text-orange-600" />
+                            Damaged
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="lost" id={`${tool.id}-lost`} />
+                          <Label htmlFor={`${tool.id}-lost`} className="cursor-pointer flex items-center font-normal">
+                            <XCircle className="mr-2 h-4 w-4 text-red-600" />
+                            Lost
+                          </Label>
+                        </div>
                       </div>
-                    )}
+                    </RadioGroup>
                   </div>
                 </div>
               ))}
@@ -467,6 +499,108 @@ export default function ActiveAssignments() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCheckInDialog(null)}>Cancel</Button>
             <Button onClick={handleCheckIn}>Confirm Check-In</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Check-In Dialog */}
+      <Dialog open={editingCompletedAssignment !== null} onOpenChange={() => setEditingCompletedAssignment(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Check-In</DialogTitle>
+            <DialogDescription>
+              Update tool conditions and notes for this completed assignment
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingCompletedAssignment && (
+            <div className="space-y-6">
+              {editingCompletedAssignment.tools.map(tool => (
+                <div key={tool.id} className="space-y-3 pb-4 border-b last:border-0">
+                  <div>
+                    <Label className="text-base font-semibold">{tool.name}</Label>
+                    {Object.entries(tool.customAttributes).length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {Object.entries(tool.customAttributes).map(([key, value]) => (
+                          <Badge key={key} variant="outline" className="text-xs">
+                            {key}: {value}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold">Tool Condition:</Label>
+                    <RadioGroup
+                      value={toolConditions[tool.id] || 'good'}
+                      onValueChange={(value: 'good' | 'damaged' | 'lost' | 'missing') =>
+                        setToolConditions({ ...toolConditions, [tool.id]: value })
+                      }
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="good" id={`edit-${tool.id}-good`} />
+                          <Label htmlFor={`edit-${tool.id}-good`} className="cursor-pointer flex items-center font-normal">
+                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
+                            Returned in good condition
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="missing" id={`edit-${tool.id}-missing`} />
+                          <Label htmlFor={`edit-${tool.id}-missing`} className="cursor-pointer flex items-center font-normal">
+                            <Clock className="mr-2 h-4 w-4 text-yellow-600" />
+                            Missing / Not returned yet
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="damaged" id={`edit-${tool.id}-damaged`} />
+                          <Label htmlFor={`edit-${tool.id}-damaged`} className="cursor-pointer flex items-center font-normal">
+                            <AlertCircle className="mr-2 h-4 w-4 text-orange-600" />
+                            Damaged
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="lost" id={`edit-${tool.id}-lost`} />
+                          <Label htmlFor={`edit-${tool.id}-lost`} className="cursor-pointer flex items-center font-normal">
+                            <XCircle className="mr-2 h-4 w-4 text-red-600" />
+                            Lost
+                          </Label>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              ))}
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Check-in Date</Label>
+                  <div className="flex items-center">
+                    <Input
+                      type="date"
+                      value={checkinDate}
+                      onChange={(e) => setCheckinDate(e.target.value)}
+                      className="w-auto h-11 max-w-[200px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Notes (Optional)</Label>
+                  <Textarea
+                    placeholder="Add any additional notes about this check-in..."
+                    value={checkinNotes}
+                    onChange={(e) => setCheckinNotes(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCompletedAssignment(null)}>Cancel</Button>
+            <Button onClick={handleEditCheckIn}>Update Check-In</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

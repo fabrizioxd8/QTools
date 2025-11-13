@@ -229,25 +229,34 @@ router.put('/:id/checkin', async (req, res) => {
         WHERE id = ?
       `, [finalCheckinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), req.params.id]);
 
-      // Update tool statuses based on conditions (damaged/lost override)
-      const damagedOrLost = new Set();
+      // Update tool statuses based on conditions
+      const damagedLostOrMissing = new Set();
       if (toolConditions) {
         for (const [toolId, condition] of Object.entries(toolConditions)) {
-          if (condition === 'damaged' || condition === 'lost') {
-            const newStatus = condition === 'damaged' ? 'Damaged' : 'Lost';
+          if (condition === 'damaged' || condition === 'lost' || condition === 'missing') {
+            let newStatus;
+            if (condition === 'damaged') newStatus = 'Damaged';
+            else if (condition === 'lost') newStatus = 'Lost';
+            else if (condition === 'missing') newStatus = 'In Use'; // Keep as In Use if missing
+            
             await runQuery(`UPDATE tools SET status = ? WHERE id = ?`, [newStatus, toolId]);
-            damagedOrLost.add(Number(toolId));
+            damagedLostOrMissing.add(Number(toolId));
           }
         }
       }
 
-      // Restore quantities for tools assigned to this assignment
+      // Restore quantities for tools assigned to this assignment (except missing ones)
       const assigned = await allQuery(`SELECT toolId, quantity FROM assignment_tools WHERE assignmentId = ?`, [req.params.id]);
       for (const row of assigned) {
-        await runQuery(`UPDATE tools SET quantity = quantity + ? WHERE id = ?`, [row.quantity || 0, row.toolId]);
+        const condition = toolConditions ? toolConditions[row.toolId] : 'good';
+        
+        // Only restore quantity if tool is not missing
+        if (condition !== 'missing') {
+          await runQuery(`UPDATE tools SET quantity = quantity + ? WHERE id = ?`, [row.quantity || 0, row.toolId]);
+        }
 
-        // If tool was not damaged/lost, and there are NO other active assignments using this tool, mark Available
-        if (!damagedOrLost.has(row.toolId)) {
+        // If tool was not damaged/lost/missing, and there are NO other active assignments using this tool, mark Available
+        if (!damagedLostOrMissing.has(row.toolId)) {
           const activeCountRow = await getQuery(`SELECT COUNT(*) as cnt FROM assignment_tools at JOIN assignments a ON at.assignmentId = a.id WHERE at.toolId = ? AND a.status = 'active'`, [row.toolId]);
           const activeCount = activeCountRow ? activeCountRow.cnt : 0;
           if (!activeCount || Number(activeCount) === 0) {
