@@ -29,6 +29,7 @@ export interface Project {
 export interface Assignment {
   id: number;
   checkoutDate: string;
+  guiaNumber?: string;
   checkoutNotes?: string;
   worker: Worker;
   project: Project;
@@ -207,6 +208,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const assignmentData = {
         checkoutDate: assignment.checkoutDate,
         checkoutNotes: assignment.checkoutNotes,
+        guiaNumber: (assignment as any).guiaNumber,
         workerId: assignment.worker.id,
         projectId: assignment.project.id,
         tools: toolsPayload
@@ -232,12 +234,18 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>
   ) => {
     try {
-      // Fix timezone issue by creating date at noon to avoid timezone shifts
+      // If caller provided a full ISO datetime (includes 'T'), use it as-is.
+      // Otherwise treat a date-only string as local date and preserve previous noon-fallback.
       let checkinDateTime: string | undefined;
       if (checkinDate) {
-        const [year, month, day] = checkinDate.split('-').map(Number);
-        const dateTime = new Date(year, month - 1, day, 12, 0, 0);
-        checkinDateTime = dateTime.toISOString();
+        if (checkinDate.includes('T')) {
+          checkinDateTime = checkinDate;
+        } else {
+          const [year, month, day] = checkinDate.split('-').map(Number);
+          // preserve old behavior for date-only: set to noon to avoid date shifts
+          const dateTime = new Date(year, month - 1, day, 12, 0, 0);
+          checkinDateTime = dateTime.toISOString();
+        }
       }
 
       const updatedAssignment = await apiClient.checkinAssignment(id, {

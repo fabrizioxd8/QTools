@@ -35,6 +35,14 @@ export default function ActiveAssignments() {
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+  // Check-in time (HH:MM) default to now
+  const [checkinTime, setCheckinTime] = useState<string>(() => {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  });
+  const checkInTopRef = useState<HTMLDivElement | null>(null)[0] as unknown as React.RefObject<HTMLDivElement>;
 
   const activeAssignments = assignments
     .filter(a => a.status === 'active')
@@ -76,12 +84,32 @@ export default function ActiveAssignments() {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     setCheckinDate(`${year}-${month}-${day}`);
+    // default time to now when opening
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    setCheckinTime(`${hh}:${mm}`);
+    // ensure dialog scroll/focus at top after open
+    setTimeout(() => {
+      const el = document.getElementById('checkin-top');
+      if (el && 'focus' in el) (el as HTMLElement).focus();
+      const scrollable = el?.closest('[role="dialog"]') as HTMLElement | null;
+      if (scrollable) scrollable.scrollTop = 0;
+    }, 0);
   };
 
   const handleCheckIn = async () => {
     if (checkInDialog) {
       try {
-        await checkInAssignment(checkInDialog.id, checkinDate, checkinNotes, toolConditions);
+        // Build ISO datetime from selected date+time
+        let checkinDateTime: string | undefined;
+        if (checkinDate) {
+          const [year, month, day] = checkinDate.split('-').map(Number);
+          const [hour, minute] = (checkinTime || '00:00').split(':').map(Number);
+          checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0).toISOString();
+        }
+
+        await checkInAssignment(checkInDialog.id, checkinDateTime, checkinNotes, toolConditions);
         toast.success('Tools checked in successfully!');
         setCheckInDialog(null);
         setCheckinNotes('');
@@ -96,7 +124,14 @@ export default function ActiveAssignments() {
   const handleEditCheckIn = async () => {
     if (editingCompletedAssignment) {
       try {
-        await checkInAssignment(editingCompletedAssignment.id, checkinDate, checkinNotes, toolConditions);
+        let checkinDateTime: string | undefined;
+        if (checkinDate) {
+          const [year, month, day] = checkinDate.split('-').map(Number);
+          const [hour, minute] = (checkinTime || '00:00').split(':').map(Number);
+          checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0).toISOString();
+        }
+
+        await checkInAssignment(editingCompletedAssignment.id, checkinDateTime, checkinNotes, toolConditions);
         toast.success('Check-in updated successfully!');
         setEditingCompletedAssignment(null);
         setCheckinNotes('');
@@ -163,7 +198,7 @@ export default function ActiveAssignments() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-info">
-                  {activeAssignments.reduce((sum, a) => sum + a.tools.length, 0)}
+                  {activeAssignments.reduce((sum, a) => sum + a.tools.reduce((s, t) => s + (t.quantity || 1), 0), 0)}
                 </div>
               </CardContent>
             </Card>
@@ -273,7 +308,7 @@ export default function ActiveAssignments() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-success">
-                  {completedAssignments.reduce((sum, a) => sum + a.tools.length, 0)}
+                  {completedAssignments.reduce((sum, a) => sum + a.tools.reduce((s, t) => s + (t.quantity || 1), 0), 0)}
                 </div>
               </CardContent>
             </Card>
@@ -351,6 +386,9 @@ export default function ActiveAssignments() {
                               const month = String(date.getMonth() + 1).padStart(2, '0');
                               const day = String(date.getDate()).padStart(2, '0');
                               setCheckinDate(`${year}-${month}-${day}`);
+                              const hh = String(date.getHours()).padStart(2, '0');
+                              const mm = String(date.getMinutes()).padStart(2, '0');
+                              setCheckinTime(`${hh}:${mm}`);
                             }
                           }}
                         >
@@ -372,6 +410,7 @@ export default function ActiveAssignments() {
                                 <Badge key={tool.id} className={getConditionBadgeClass(condition)}>
                                   <ConditionIcon className="mr-1 h-3 w-3" />
                                   {tool.name} ({condition})
+                                      {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
                                 </Badge>
                               );
                             })}
@@ -413,10 +452,10 @@ export default function ActiveAssignments() {
 
           {checkInDialog && (
             <div className="space-y-6">
-              {checkInDialog.tools.map(tool => (
+              {checkInDialog.tools.map((tool, idx) => (
                 <div key={tool.id} className="space-y-3 pb-4 border-b last:border-0">
                   <div>
-                    <Label className="text-base font-semibold">{tool.name}</Label>
+                    <Label id={idx === 0 ? 'checkin-top' : undefined} tabIndex={idx === 0 ? -1 : undefined} className="text-base font-semibold">{tool.name} {tool.quantity && tool.quantity > 1 ? `(${tool.quantity})` : ''}</Label>
                     {Object.entries(tool.customAttributes).length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-2">
                         {Object.entries(tool.customAttributes).map(([key, value]) => (
@@ -480,6 +519,16 @@ export default function ActiveAssignments() {
                       onChange={(e) => setCheckinDate(e.target.value)}
                       className="w-auto h-11 max-w-[200px]"
                     />
+                    <div className="ml-4">
+                      <Label className="sr-only" htmlFor="checkin-time">Check-in time</Label>
+                      <Input
+                        id="checkin-time"
+                        type="time"
+                        value={checkinTime}
+                        onChange={(e) => setCheckinTime(e.target.value)}
+                        className="w-auto h-11 max-w-[140px]"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -582,6 +631,16 @@ export default function ActiveAssignments() {
                       onChange={(e) => setCheckinDate(e.target.value)}
                       className="w-auto h-11 max-w-[200px]"
                     />
+                    <div className="ml-4">
+                      <Label className="sr-only" htmlFor="edit-checkin-time">Check-in time</Label>
+                      <Input
+                        id="edit-checkin-time"
+                        type="time"
+                        value={checkinTime}
+                        onChange={(e) => setCheckinTime(e.target.value)}
+                        className="w-auto h-11 max-w-[140px]"
+                      />
+                    </div>
                   </div>
                 </div>
 

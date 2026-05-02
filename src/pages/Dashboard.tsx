@@ -2,6 +2,7 @@ import { Wrench, CheckCircle, Clock, Users, AlertTriangle, Plus, ShoppingCart, C
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useAppData } from '@/contexts/AppDataContext';
 import { Progress } from '@/components/ui/progress';
 
@@ -98,36 +99,64 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       <div className="grid gap-4 md:grid-cols-2">
         {/* Calibration Alerts */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              <CardTitle>Calibration Alerts</CardTitle>
-            </div>
-            <CardDescription>Tools requiring calibration within 30 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {calibrationAlerts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No upcoming calibrations</p>
-            ) : (
-              <div className="space-y-3">
-                {calibrationAlerts.map(tool => {
-                  const dueDate = new Date(tool.calibrationDue!);
-                  const isOverdue = dueDate < today;
-                  return (
-                    <div key={tool.id} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{tool.name}</p>
-                        <p className="text-xs text-muted-foreground">{tool.category}</p>
-                      </div>
-                      <Badge variant={isOverdue ? 'destructive' : 'secondary'}>
-                        {isOverdue ? 'Overdue' : dueDate.toLocaleDateString()}
-                      </Badge>
-                    </div>
-                  );
-                })}
+          <TooltipProvider delayDuration={0}>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                <CardTitle>Calibration Alerts</CardTitle>
               </div>
-            )}
-          </CardContent>
+              <CardDescription>Tools requiring calibration within 30 days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {calibrationAlerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No upcoming calibrations</p>
+              ) : (
+                <div className="space-y-3">
+                  {calibrationAlerts.map(tool => {
+                    const dueDate = new Date(tool.calibrationDue!);
+                    const isOverdue = dueDate < today;
+                    const details = Object.entries(tool.customAttributes || {}).map(([key, value]) => `${key}: ${value}`);
+                    return (
+                      <div key={tool.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{tool.name}</p>
+                          <p className="text-xs text-muted-foreground">{tool.category}</p>
+                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="focus-visible:ring-ring focus-visible:outline-none"
+                              onClick={() => {
+                                window.localStorage.setItem('toolSearchTerm', tool.name);
+                                onNavigate('tools');
+                              }}
+                            >
+                              <Badge variant={isOverdue ? 'destructive' : 'secondary'}>
+                                {isOverdue ? 'Overdue' : dueDate.toLocaleDateString()}
+                              </Badge>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs text-left">
+                            <p className="font-semibold">{tool.name}</p>
+                            <p className="text-xs text-muted-foreground">Due: {dueDate.toLocaleDateString()}</p>
+                            {details.length > 0 && (
+                              <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+                                {details.map((detail, index) => (
+                                  <p key={index}>{detail}</p>
+                                ))}
+                              </div>
+                            )}
+                            <p className="mt-2 text-xs text-muted-foreground">Click the badge to open Tools with this name prefilled.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </TooltipProvider>
         </Card>
 
         {/* Quick Actions */}

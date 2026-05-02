@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImageUploadBox } from '@/components/ImageUploadBox';
 import { useAppData, Tool } from '@/contexts/AppDataContext';
+import { matchesSearch } from '@/lib/search';
 import { getUploadUrl } from '@/lib/api';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
@@ -100,12 +101,20 @@ export default function ToolsManager() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    const storedSearch = window.localStorage.getItem('toolSearchTerm');
+    if (storedSearch) {
+      setSearchQuery(storedSearch);
+      window.localStorage.removeItem('toolSearchTerm');
+    }
+  }, []);
+
   const filteredTools = tools
     .filter(tool => {
       const matchesCategory = categoryFilter === 'All' || tool.category === categoryFilter;
       const matchesStatus = statusFilter === 'All' || tool.status === statusFilter;
-      const matchesSearch = tool.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesStatus && matchesSearch;
+      const matches = matchesSearch(tool.name, searchQuery);
+      return matchesCategory && matchesStatus && matches;
     })
     .sort((a, b) => {
       if (!sortField) return 0;
@@ -466,14 +475,16 @@ export default function ToolsManager() {
                   {/* Status badge with optional tooltip when In Use */}
                   {tool.status === 'In Use' ? (
                     (() => {
-                      // Build assignment breakdown for this tool
+                      // Build assignment breakdown for this tool (ACTIVE assignments only)
                       const entries: Array<{ projectName: string; qty: number }> = [];
                       assignments.forEach(asg => {
-                        asg.tools.forEach(t => {
-                          if (t.id === tool.id && (t.quantity || 1) > 0) {
-                            entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-                          }
-                        });
+                        if (asg.status === 'active') {
+                          asg.tools.forEach(t => {
+                            if (t.id === tool.id && (t.quantity || 1) > 0) {
+                              entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+                            }
+                          });
+                        }
                       });
 
                       const hasEntries = entries.length > 0;
@@ -574,14 +585,16 @@ export default function ToolsManager() {
                           <Badge variant="outline">{tool.category}</Badge>
                           {tool.status === 'In Use' ? (
                             (() => {
-                              // Build assignment breakdown for this tool
+                              // Build assignment breakdown for this tool (ACTIVE assignments only)
                               const entries: Array<{ projectName: string; qty: number }> = [];
                               assignments.forEach(asg => {
-                                asg.tools.forEach(t => {
-                                  if (t.id === tool.id && (t.quantity || 1) > 0) {
-                                    entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-                                  }
-                                });
+                                if (asg.status === 'active') {
+                                  asg.tools.forEach(t => {
+                                    if (t.id === tool.id && (t.quantity || 1) > 0) {
+                                      entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+                                    }
+                                  });
+                                }
                               });
 
                               const hasEntries = entries.length > 0;

@@ -116,6 +116,15 @@ const runMigrations = () => {
         }
       });
     }
+    // Ensure guiaNumber column exists on assignments
+    const hasGuia = columns.some(col => col.name === 'guiaNumber');
+    if (!hasGuia) {
+      console.log('🔄 Adding guiaNumber column to assignments table...');
+      db.run("ALTER TABLE assignments ADD COLUMN guiaNumber TEXT", (err) => {
+        if (err) console.error('Error adding guiaNumber column:', err);
+        else console.log('✅ guiaNumber column added successfully');
+      });
+    }
   });
   
   // Ensure tools table has certificateNumber and quantity columns

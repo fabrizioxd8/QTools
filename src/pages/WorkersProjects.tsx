@@ -22,6 +22,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppData, Worker, Project } from '@/contexts/AppDataContext';
+import { matchesSearch } from '@/lib/search';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -253,15 +254,14 @@ export default function WorkersProjects() {
     }
 
     return sortableWorkers.filter(w =>
-      w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
-      w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
+      matchesSearch(w.name, workerSearch) || matchesSearch(w.employeeId, workerSearch)
     );
   }, [workers, workerSearch, workerSortField, workerSortDirection, workerStats]);
 
 
 
   const filteredProjects = projects
-    .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+    .filter(p => matchesSearch(p.name, projectSearch))
     .sort((a, b) => {
       if (!projectSortField) return 0;
 
