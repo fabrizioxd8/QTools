@@ -10,6 +10,7 @@ router.get('/', async (req, res) => {
       SELECT 
         a.id,
         a.checkoutDate,
+          a.guiaNumber,
         a.checkoutNotes,
         a.checkinDate,
         a.status,
@@ -56,6 +57,7 @@ router.get('/', async (req, res) => {
 
         return {
           id: assignment.id,
+          guiaNumber: assignment.guiaNumber,
           checkoutDate: assignment.checkoutDate,
           checkoutNotes: assignment.checkoutNotes,
           checkinDate: assignment.checkinDate,
@@ -86,7 +88,7 @@ router.get('/', async (req, res) => {
 // POST /api/assignments - Create new assignment (quantity-aware)
 router.post('/', async (req, res) => {
   try {
-    const { checkoutDate, checkoutNotes, workerId, projectId, tools } = req.body;
+    const { checkoutDate, checkoutNotes, workerId, projectId, tools, guiaNumber } = req.body;
 
     if (!checkoutDate || !workerId || !projectId || !tools || !Array.isArray(tools)) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -105,9 +107,9 @@ router.post('/', async (req, res) => {
     try {
       // Create assignment
       const result = await runQuery(`
-        INSERT INTO assignments (checkoutDate, checkoutNotes, workerId, projectId, status)
-        VALUES (?, ?, ?, ?, 'active')
-      `, [checkoutDate, checkoutNotes || null, workerId, projectId]);
+        INSERT INTO assignments (checkoutDate, checkoutNotes, guiaNumber, workerId, projectId, status)
+        VALUES (?, ?, ?, ?, ?, 'active')
+      `, [checkoutDate, checkoutNotes || null, guiaNumber || null, workerId, projectId]);
 
       assignmentId = result.id;
 
@@ -144,6 +146,7 @@ router.post('/', async (req, res) => {
     const assignment = await getQuery(`
       SELECT 
         a.id,
+        a.guiaNumber,
         a.checkoutDate,
         a.checkoutNotes,
         a.checkinDate,
@@ -189,6 +192,7 @@ router.post('/', async (req, res) => {
     const completeAssignment = {
       id: assignment.id,
       checkoutDate: assignment.checkoutDate,
+      guiaNumber: assignment.guiaNumber,
       checkoutNotes: assignment.checkoutNotes,
       checkinDate: assignment.checkinDate,
       status: assignment.status,
@@ -245,7 +249,7 @@ router.put('/:id/checkin', async (req, res) => {
         }
       }
 
-      // Restore quantities for tools assigned to this assignment (except missing ones)
+      // Restore quantities for tools assigned to this assignment
       const assigned = await allQuery(`SELECT toolId, quantity FROM assignment_tools WHERE assignmentId = ?`, [req.params.id]);
       for (const row of assigned) {
         const condition = toolConditions ? toolConditions[row.toolId] : 'good';
@@ -255,8 +259,10 @@ router.put('/:id/checkin', async (req, res) => {
           await runQuery(`UPDATE tools SET quantity = quantity + ? WHERE id = ?`, [row.quantity || 0, row.toolId]);
         }
 
-        // If tool was not damaged/lost/missing, and there are NO other active assignments using this tool, mark Available
-        if (!damagedLostOrMissing.has(row.toolId)) {
+        // Update status to Available if:
+        // 1. Tool was not damaged/lost (missing is OK to check)
+        // 2. There are NO other active assignments using this tool
+        if (condition !== 'damaged' && condition !== 'lost') {
           const activeCountRow = await getQuery(`SELECT COUNT(*) as cnt FROM assignment_tools at JOIN assignments a ON at.assignmentId = a.id WHERE at.toolId = ? AND a.status = 'active'`, [row.toolId]);
           const activeCount = activeCountRow ? activeCountRow.cnt : 0;
           if (!activeCount || Number(activeCount) === 0) {

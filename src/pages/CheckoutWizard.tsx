@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CheckCircle, ChevronLeft, ChevronRight, Search, User, Folder, Wrench } from 'lucide-react';
+import { matchesSearch } from '@/lib/search';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,14 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const [workerSearch, setWorkerSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
   const [checkoutNotes, setCheckoutNotes] = useState('');
+  const [guiaNumber, setGuiaNumber] = useState('');
+  // Checkout time (HH:MM) default to current time
+  const [checkoutTime, setCheckoutTime] = useState<string>(() => {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  });
 
   // Search input refs
   const toolSearchInputRef = useRef<HTMLInputElement>(null);
@@ -47,16 +56,14 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     const qty = t.quantity ?? 0;
     return t.status === 'Available' || (t.status === 'In Use' && qty > 0);
   });
-  const filteredTools = availableTools.filter(t =>
-    t.name.toLowerCase().includes(toolSearch.toLowerCase())
-  );
-  const filteredWorkers = workers.filter(w =>
-    w.name.toLowerCase().includes(workerSearch.toLowerCase()) ||
-    w.employeeId.toLowerCase().includes(workerSearch.toLowerCase())
-  );
-  const filteredProjects = projects.filter(p =>
-    p.name.toLowerCase().includes(projectSearch.toLowerCase())
-  );
+  const availableToolTypes = availableTools.length;
+  const availableItemCount = availableTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0);
+  const selectedToolTypes = selectedTools.length;
+  const selectedItemCount = selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0);
+
+  const filteredTools = availableTools.filter(t => matchesSearch(t.name, toolSearch));
+  const filteredWorkers = workers.filter(w => matchesSearch(w.name, workerSearch) || matchesSearch(w.employeeId, workerSearch));
+  const filteredProjects = projects.filter(p => matchesSearch(p.name, projectSearch));
 
   const steps = [
     { number: 1, title: 'Select Tools', icon: CheckCircle },
@@ -106,17 +113,19 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const handleComplete = async () => {
     if (selectedWorker && selectedProject && selectedTools.length > 0) {
       try {
-        // Fix timezone issue by creating date at noon to avoid timezone shifts
+        // Build local date+time from selected date and time
         const [year, month, day] = checkoutDate.split('-').map(Number);
-        const checkoutDateTime = new Date(year, month - 1, day, 12, 0, 0);
+        const [hour, minute] = checkoutTime.split(':').map(Number);
+        const checkoutDateObj = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0);
 
         await createAssignment({
-          checkoutDate: checkoutDateTime.toISOString(),
+          checkoutDate: checkoutDateObj.toISOString(),
           checkoutNotes: checkoutNotes.trim() || undefined,
           worker: selectedWorker,
           project: selectedProject,
           tools: selectedTools,
-        });
+          guiaNumber: guiaNumber.trim() || undefined,
+        } as any);
 
         toast.success('Checkout completed successfully!');
 
@@ -192,36 +201,27 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              {steps.map((step, idx) => (
-                <div key={step.number} className="flex items-center">
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${currentStep >= step.number
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background text-muted-foreground border-border'
-                      }`}
-                  >
-                    <step.icon className="h-5 w-5" />
-                  </div>
-                  {idx < steps.length - 1 && (
-                    <div
-                      className={`h-0.5 w-12 md:w-24 mx-2 ${currentStep > step.number ? 'bg-primary' : 'bg-border'
-                        }`}
-                    />
-                  )}
+            <div className="relative">
+              <div className="relative">
+                <div className="absolute inset-x-0 top-1/2 h-px bg-border translate-y-1/2" />
+                <div className="grid grid-cols-4 items-center gap-4">
+                  {steps.map(step => (
+                    <div key={step.number} className="relative flex flex-col items-center text-center">
+                      <div
+                        className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-2 ${currentStep >= step.number
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-muted-foreground border-border'
+                          }`}
+                      >
+                        <step.icon className="h-5 w-5" />
+                      </div>
+                      <span className={`mt-2 text-xs md:text-sm ${currentStep >= step.number ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                        {step.title}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-xs md:text-sm">
-              {steps.map(step => (
-                <span
-                  key={step.number}
-                  className={`${currentStep >= step.number ? 'text-foreground font-medium' : 'text-muted-foreground'
-                    }`}
-                >
-                  {step.title}
-                </span>
-              ))}
+              </div>
             </div>
             <Progress value={progressPercentage} />
           </div>
@@ -273,27 +273,33 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <Checkbox checked={isSelected} />
-                              {isSelected && (tool.quantity || 1) > 1 && (
-                                <div className="relative">
-                                  <Label htmlFor={`quantity-${tool.id}`} className="sr-only">Quantity for {tool.name}</Label>
-                                  <input
-                                    id={`quantity-${tool.id}`}
-                                    type="number"
-                                    min={1}
-                                    max={tool.quantity || 1}
-                                    value={selectedTools.find(t => t.id === tool.id)?.quantity || 1}
-                                    onChange={(e) => {
-                                      const max = tool.quantity || 1;
-                                      let v = Math.max(1, Number(e.target.value || 1));
-                                      if (v > max) v = max;
-                                      updateSelectedToolQuantity(tool.id, v);
-                                    }}
-                                    className="h-8 w-16 text-sm rounded border px-2"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </div>
-                              )}
+                                        <Checkbox checked={isSelected} />
+                                        {isSelected && (tool.quantity || 1) > 1 && (
+                                          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                              aria-label={`Decrease quantity for ${tool.name}`}
+                                              className="h-8 w-8 rounded border flex items-center justify-center"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
+                                                const next = Math.max(1, current - 1);
+                                                updateSelectedToolQuantity(tool.id, next);
+                                              }}
+                                            >-</button>
+                                            <div className="w-12 text-center">{selectedTools.find(t => t.id === tool.id)?.quantity || 1}</div>
+                                            <button
+                                              aria-label={`Increase quantity for ${tool.name}`}
+                                              className="h-8 w-8 rounded border flex items-center justify-center"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
+                                                const max = tool.quantity || 1;
+                                                const next = Math.min(max, current + 1);
+                                                updateSelectedToolQuantity(tool.id, next);
+                                              }}
+                                            >+</button>
+                                          </div>
+                                        )}
                             </div>
                           </div>
                         </CardHeader>
@@ -435,7 +441,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
           <CardContent>
             <div className="space-y-6">
               <div>
-                <h3 className="font-semibold mb-2">Selected Tools ({selectedTools.length})</h3>
+                <h3 className="font-semibold mb-2">Selected Tools ({selectedToolTypes} tools out of {selectedItemCount} items)</h3>
                 <div className="space-y-2">
                   {selectedTools.map(tool => (
                     <div key={tool.id} className="p-3 bg-muted rounded-lg">
@@ -499,7 +505,27 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                     onChange={(e) => setCheckoutDate(e.target.value)}
                     className="w-auto h-11 max-w-[200px]"
                   />
+                  <div className="ml-4">
+                    <Label className="sr-only" htmlFor="checkout-time">Checkout time</Label>
+                    <Input
+                      id="checkout-time"
+                      type="time"
+                      value={checkoutTime}
+                      onChange={(e) => setCheckoutTime(e.target.value)}
+                      className="w-auto h-11 max-w-[140px]"
+                    />
+                  </div>
                 </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold mb-2">Número de guía (Opcional)</h3>
+                <Input
+                  placeholder="Número de guía"
+                  value={guiaNumber}
+                  onChange={(e) => setGuiaNumber(e.target.value)}
+                  className="w-full max-w-md"
+                />
               </div>
 
               <div>
@@ -518,8 +544,13 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
             </div>
           </CardContent>
         </Card>
+      )}      {currentStep === 4 && (
+        <div className="px-4 pb-4">
+          <div className="text-sm text-muted-foreground">
+            {selectedToolTypes} tools out of {selectedItemCount} items selected
+          </div>
+        </div>
       )}
-
       {/* Navigation */}
       <div
         className={`fixed bottom-0 right-0 bg-background/95 backdrop-blur-sm border-t p-4 transition-all duration-200 ease-in-out shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1),0_-2px_4px_-1px_rgba(0,0,0,0.06)] ${isMobile
@@ -530,10 +561,11 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
           }`}
       >
         <div className="max-w-7xl mx-auto flex justify-between items-center px-2">
-          {currentStep === 1 && selectedTools.length > 0 && (
+          {currentStep === 1 && selectedToolTypes > 0 && (
             <div className="flex items-center gap-2 text-sm">
               <Wrench className="h-5 w-5 text-primary" />
-              <span className="font-bold">{selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0)}</span> tool{selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0) > 1 ? 's' : ''} selected
+              <span className="font-bold">{selectedToolTypes} tools</span>
+              <span>out of {selectedItemCount} items selected</span>
             </div>
           )}
           {currentStep > 1 && (
