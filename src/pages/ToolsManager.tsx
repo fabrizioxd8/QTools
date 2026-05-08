@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Search, Grid3X3, List, LayoutGrid, ArrowUpDown, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Grid3X3, List, LayoutGrid, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -229,6 +229,45 @@ export default function ToolsManager() {
       return;
     }
     setDeleteConfirmId(id);
+  };
+
+  const renderCalibrationStatus = (tool: Tool) => {
+    if (!tool.isCalibrable || !tool.calibrationDue) return null;
+
+    const dueDate = new Date(tool.calibrationDue);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+
+    const thirtyDaysFromNow = new Date(today);
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+    let state = 'ok';
+    if (dueDate < today) state = 'overdue';
+    else if (dueDate <= thirtyDaysFromNow) state = 'soon';
+
+    let style = '';
+    let Icon = Calendar;
+
+    if (state === 'overdue') {
+      style = 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400 border-red-200/60 dark:border-red-700/40';
+      Icon = AlertTriangle;
+    } else if (state === 'soon') {
+      style = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200/60 dark:border-yellow-700/40';
+      Icon = AlertTriangle;
+    } else {
+      style = 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200/60 dark:border-green-700/40';
+      Icon = CheckCircle;
+    }
+
+    return (
+      <div className="mt-3 mb-2">
+        <Badge variant="outline" className={`flex w-fit items-center gap-1.5 ${style}`}>
+          <Icon className="h-3 w-3" />
+          <span>Cal. Due: {dueDate.toLocaleDateString()}</span>
+        </Badge>
+      </div>
+    );
   };
 
   const handleDelete = async (id: number) => {
@@ -534,11 +573,7 @@ export default function ToolsManager() {
                     </div>
                   )}
 
-                  {tool.isCalibrable && tool.calibrationDue && (
-                    <p className="text-sm text-muted-foreground mb-4">
-                      <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
-                    </p>
-                  )}
+                  {renderCalibrationStatus(tool)}
 
                 </div>
 
@@ -661,11 +696,7 @@ export default function ToolsManager() {
                     )}
 
                     {/* Calibration Info */}
-                    {tool.isCalibrable && tool.calibrationDue && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        <span className="font-medium">Cal. Due:</span> {new Date(tool.calibrationDue).toLocaleDateString()}
-                      </p>
-                    )}
+                    {renderCalibrationStatus(tool)}
 
                   </div>
                 </div>
