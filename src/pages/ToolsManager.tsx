@@ -26,6 +26,9 @@ import { useAppData, Tool } from '@/contexts/AppDataContext';
 import { matchesSearch } from '@/lib/search';
 import { getUploadUrl } from '@/lib/api';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+import { Download } from 'lucide-react';
 
 type ExtendedTool = Tool & Partial<{ certificateNumber: string; quantity: number }>;
 import { toast } from 'sonner';
@@ -335,6 +338,57 @@ export default function ToolsManager() {
     }
   };
 
+  const handleExportExcel = () => {
+    try {
+      // Collect all unique custom attribute keys
+      const customAttributeKeys = new Set<string>();
+      filteredTools.forEach(tool => {
+        if (tool.customAttributes) {
+          Object.keys(tool.customAttributes).forEach(key => customAttributeKeys.add(key));
+        }
+      });
+      const customAttrColumns = Array.from(customAttributeKeys);
+
+      // Map tools to row data
+      const data = filteredTools.map(tool => {
+        const row: Record<string, string | number> = {
+          'Name': tool.name,
+          'Category': tool.category,
+          'Status': tool.status,
+          'Quantity': (tool as ExtendedTool).quantity || 1,
+          'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
+          'Calibration Due': tool.calibrationDue || '',
+          'Certificate Number': (tool as ExtendedTool).certificateNumber || '',
+        };
+
+        // Add custom attributes
+        customAttrColumns.forEach(key => {
+          row[key] = tool.customAttributes[key] || '';
+        });
+
+        return row;
+      });
+
+      // Create worksheet and workbook
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory');
+
+      // Generate Excel file buffer
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+
+      // Save file
+      const dateString = new Date().toISOString().split('T')[0];
+      saveAs(dataBlob, `Inventory_Export_${dateString}.xlsx`);
+
+      toast.success('Inventory exported successfully');
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Failed to export inventory');
+    }
+  };
+
   // Handle Ctrl+F to focus search bar
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -357,10 +411,16 @@ export default function ToolsManager() {
           <h1 className="text-3xl font-bold">Tools Manager</h1>
           <p className="text-muted-foreground">Manage your tool inventory</p>
         </div>
-        <Button onClick={() => openDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add New Tool
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportExcel}>
+            <Download className="mr-2 h-4 w-4" />
+            Export to Excel
+          </Button>
+          <Button onClick={() => openDialog()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add New Tool
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
