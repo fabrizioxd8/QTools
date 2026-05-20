@@ -33,3 +33,6 @@
 [1]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
 [1] 6:03:24 AM [vite] (client) ✨ new dependencies optimized: xlsx, file-saver
 [1] 6:03:24 AM [vite] (client) ✨ optimized dependencies changed. reloading
+[1] 7:13:53 AM [vite] (client) hmr update /src/pages/ToolsManager.tsx, /src/index.css
+[1] 7:14:18 AM [vite] (client) hmr update /src/pages/ToolsManager.tsx, /src/index.css
+[1] 7:20:11 AM [vite] (client) hmr update /src/pages/ToolsManager.tsx, /src/index.css

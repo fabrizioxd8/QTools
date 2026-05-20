@@ -46,6 +46,8 @@ import {
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools', 'Cleaning and Maintenance', 'Workstation Equipment'];
 const statuses: Tool['status'][] = ['Available', 'In Use', 'Damaged', 'Lost', 'Cal. Due'];
 
+const standardAttributes = ['Brand', 'Model', 'Serial Number', 'Location', 'Purchase Date', 'Custom'];
+
 export default function ToolsManager() {
   const { tools, addTool, updateTool, deleteTool, assignments } = useAppData();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -95,6 +97,7 @@ export default function ToolsManager() {
     customAttributes: {} as Record<string, string>,
   });
 
+  const [newAttrKeyType, setNewAttrKeyType] = useState('Brand');
   const [newAttrKey, setNewAttrKey] = useState('');
   const [newAttrValue, setNewAttrValue] = useState('');
   const [draggedAttrIndex, setDraggedAttrIndex] = useState<number | null>(null);
@@ -163,6 +166,7 @@ export default function ToolsManager() {
       });
     }
     // Clear custom attribute input fields
+    setNewAttrKeyType('Brand');
     setNewAttrKey('');
     setNewAttrValue('');
     setIsDialogOpen(true);
@@ -170,12 +174,15 @@ export default function ToolsManager() {
 
   const closeDialog = () => {
     // Check if there are unsaved custom attributes
-    if (newAttrKey.trim() || newAttrValue.trim()) {
+    const isCustom = newAttrKeyType === 'Custom';
+
+    if (newAttrValue.trim() || (isCustom && newAttrKey.trim())) {
       setShowUnsavedWarning(true);
       return;
     }
     setIsDialogOpen(false);
     // Clear custom attribute input fields when closing
+    setNewAttrKeyType('Brand');
     setNewAttrKey('');
     setNewAttrValue('');
   };
@@ -183,6 +190,7 @@ export default function ToolsManager() {
   const confirmCloseDialog = () => {
     setShowUnsavedWarning(false);
     setIsDialogOpen(false);
+    setNewAttrKeyType('Brand');
     setNewAttrKey('');
     setNewAttrValue('');
   };
@@ -194,7 +202,9 @@ export default function ToolsManager() {
     }
 
     // Check if there are unsaved custom attributes
-    if (newAttrKey.trim() || newAttrValue.trim()) {
+    const isCustom = newAttrKeyType === 'Custom';
+
+    if (newAttrValue.trim() || (isCustom && newAttrKey.trim())) {
       toast.error('Please add or clear the custom attribute fields before saving');
       return;
     }
@@ -285,14 +295,18 @@ export default function ToolsManager() {
   };
 
   const addCustomAttribute = () => {
-    if (newAttrKey && newAttrValue) {
+    const isCustom = newAttrKeyType === 'Custom';
+    const keyToUse = isCustom ? newAttrKey : newAttrKeyType;
+
+    if (keyToUse && newAttrValue) {
       setFormData({
         ...formData,
         customAttributes: {
           ...formData.customAttributes,
-          [newAttrKey]: newAttrValue,
+          [keyToUse]: newAttrValue,
         },
       });
+      setNewAttrKeyType('Brand');
       setNewAttrKey('');
       setNewAttrValue('');
     }
@@ -340,14 +354,8 @@ export default function ToolsManager() {
 
   const handleExportExcel = () => {
     try {
-      // Collect all unique custom attribute keys
-      const customAttributeKeys = new Set<string>();
-      filteredTools.forEach(tool => {
-        if (tool.customAttributes) {
-          Object.keys(tool.customAttributes).forEach(key => customAttributeKeys.add(key));
-        }
-      });
-      const customAttrColumns = Array.from(customAttributeKeys);
+      // The standard attributes that should get their own columns (excluding 'Custom')
+      const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
 
       // Map tools to row data
       const data = filteredTools.map(tool => {
@@ -361,10 +369,20 @@ export default function ToolsManager() {
           'Certificate Number': (tool as ExtendedTool).certificateNumber || '',
         };
 
-        // Add custom attributes
-        customAttrColumns.forEach(key => {
+        // Add standard custom attributes to primary columns
+        standardKeys.forEach(key => {
           row[key] = tool.customAttributes[key] || '';
         });
+
+        // Consolidate the rest of the custom attributes into a single string
+        const extraInfo: string[] = [];
+        Object.entries(tool.customAttributes).forEach(([key, value]) => {
+          if (!standardKeys.includes(key)) {
+            extraInfo.push(`${key}: ${value}`);
+          }
+        });
+
+        row['EXTRA INFORMATION'] = extraInfo.join(' | ');
 
         return row;
       });
@@ -919,28 +937,44 @@ export default function ToolsManager() {
                     </div>
                   ))}
 
-                  <div className="flex gap-3 p-3 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-                    <Input
-                      placeholder="Attribute name (e.g., Brand)"
-                      value={newAttrKey}
-                      onChange={(e) => setNewAttrKey(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Input
-                      placeholder="Value (e.g., Fluke)"
-                      value={newAttrValue}
-                      onChange={(e) => setNewAttrValue(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      onClick={addCustomAttribute}
-                      disabled={!newAttrKey || !newAttrValue}
-                      size="sm"
-                      className="px-3"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                  <div className="flex flex-col gap-3 p-3 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                    <div className="flex gap-3">
+                      <Select value={newAttrKeyType} onValueChange={(value) => setNewAttrKeyType(value)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Attribute type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {standardAttributes.map(attr => (
+                            <SelectItem key={attr} value={attr}>{attr}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {newAttrKeyType === 'Custom' && (
+                        <Input
+                          placeholder="Custom Name"
+                          value={newAttrKey}
+                          onChange={(e) => setNewAttrKey(e.target.value)}
+                          className="flex-1"
+                        />
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      <Input
+                        placeholder="Value (e.g., Fluke)"
+                        value={newAttrValue}
+                        onChange={(e) => setNewAttrValue(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        onClick={addCustomAttribute}
+                        disabled={!(newAttrKeyType === 'Custom' ? newAttrKey : newAttrKeyType) || !newAttrValue}
+                        size="sm"
+                        className="px-3"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
