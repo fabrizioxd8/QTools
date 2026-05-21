@@ -51,17 +51,33 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     return `${year}-${month}-${day}`;
   });
 
-  // Treat a tool as available if its status is 'Available' OR it is 'In Use' but still has quantity left
-  const availableTools = tools.filter(t => {
-    const qty = t.quantity ?? 0;
-    return t.status === 'Available' || (t.status === 'In Use' && qty > 0);
+  const getBucketKey = (tool: Tool) => {
+    return `${tool.name}|${tool.category}|${JSON.stringify(tool.customAttributes)}`;
+  };
+
+  // Group available tools into buckets
+  const toolBucketsMap = new Map<string, Tool[]>();
+  tools.filter(t => t.status === 'Available').forEach(tool => {
+    const key = getBucketKey(tool);
+    if (!toolBucketsMap.has(key)) {
+      toolBucketsMap.set(key, []);
+    }
+    toolBucketsMap.get(key)!.push(tool);
   });
-  const availableToolTypes = availableTools.length;
-  const availableItemCount = availableTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0);
+
+  const availableToolBuckets = Array.from(toolBucketsMap.values()).map(bucket => ({
+    key: getBucketKey(bucket[0]),
+    representativeTool: bucket[0],
+    availableCount: bucket.length,
+    instances: bucket
+  }));
+
+  const availableToolTypes = availableToolBuckets.length;
+  const availableItemCount = availableToolBuckets.reduce((sum, bucket) => sum + bucket.availableCount, 0);
   const selectedToolTypes = selectedTools.length;
   const selectedItemCount = selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0);
 
-  const filteredTools = availableTools.filter(t => matchesSearch(t.name, toolSearch));
+  const filteredBuckets = availableToolBuckets.filter(b => matchesSearch(b.representativeTool.name, toolSearch));
   const filteredWorkers = workers.filter(w => matchesSearch(w.name, workerSearch) || matchesSearch(w.employeeId, workerSearch));
   const filteredProjects = projects.filter(p => matchesSearch(p.name, projectSearch));
 
@@ -94,20 +110,20 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     }
   };
 
-  const toggleToolSelection = (tool: Tool) => {
+  const toggleToolSelection = (bucketKey: string, representativeTool: Tool) => {
     setSelectedTools(prev => {
-      const exists = prev.find(t => t.id === tool.id);
+      const exists = prev.find(t => getBucketKey(t) === bucketKey);
       if (exists) {
-        return prev.filter(t => t.id !== tool.id);
+        return prev.filter(t => getBucketKey(t) !== bucketKey);
       } else {
         // default quantity to 1 when selecting
-        return [...prev, { ...tool, quantity: 1 }];
+        return [...prev, { ...representativeTool, quantity: 1 }];
       }
     });
   };
 
-  const updateSelectedToolQuantity = (toolId: number, qty: number) => {
-    setSelectedTools(prev => prev.map(t => t.id === toolId ? { ...t, quantity: qty } : t));
+  const updateSelectedToolQuantity = (bucketKey: string, qty: number) => {
+    setSelectedTools(prev => prev.map(t => getBucketKey(t) === bucketKey ? { ...t, quantity: qty } : t));
   };
 
   const handleComplete = async () => {
@@ -118,12 +134,28 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
         const [hour, minute] = checkoutTime.split(':').map(Number);
         const checkoutDateObj = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0);
 
+        // Expand the selected buckets into individual tool instances based on the requested quantity
+        const finalToolsToCheckout: Tool[] = [];
+
+        selectedTools.forEach(selectedTool => {
+          const bucketKey = getBucketKey(selectedTool);
+          const bucket = availableToolBuckets.find(b => b.key === bucketKey);
+          if (bucket) {
+            const requestedQuantity = selectedTool.quantity || 1;
+            const assignedInstances = bucket.instances.slice(0, requestedQuantity);
+
+            assignedInstances.forEach(instance => {
+              finalToolsToCheckout.push({ ...instance, quantity: 1 });
+            });
+          }
+        });
+
         await createAssignment({
           checkoutDate: checkoutDateObj.toISOString(),
           checkoutNotes: checkoutNotes.trim() || undefined,
           worker: selectedWorker,
           project: selectedProject,
-          tools: selectedTools,
+          tools: finalToolsToCheckout,
           guiaNumber: guiaNumber.trim() || undefined,
         } as any);
 
@@ -248,18 +280,23 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                 />
               </div>
 
-              {filteredTools.length === 0 ? (
+              {availableToolBuckets.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No available tools found</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredTools.map(tool => {
-                    const isSelected = selectedTools.some(t => t.id === tool.id);
+                  {filteredBuckets.map(bucket => {
+                    const tool = bucket.representativeTool;
+                    const bucketKey = bucket.key;
+                    const isSelected = selectedTools.some(t => getBucketKey(t) === bucketKey);
+                    const selectedTool = selectedTools.find(t => getBucketKey(t) === bucketKey);
+                    const availableQuantity = bucket.availableCount;
+
                     return (
                       <Card
-                        key={tool.id}
+                        key={bucketKey}
                         className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? 'ring-2 ring-primary' : ''
                           }`}
-                        onClick={() => toggleToolSelection(tool)}
+                        onClick={() => toggleToolSelection(bucketKey, tool)}
                       >
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between">
@@ -267,6 +304,9 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                               <CardTitle className="text-base">{tool.name}</CardTitle>
                               <Badge variant="outline">{tool.category}</Badge>
                               <div className="text-xs text-muted-foreground pt-1 space-x-2">
+                                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                  {availableQuantity} Available
+                                </Badge>
                                 {Object.entries(tool.customAttributes).map(([key, value]) => (
                                   <Badge key={key} variant="secondary">{key}: {value}</Badge>
                                 ))}
@@ -274,28 +314,28 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                             </div>
                             <div className="flex items-center space-x-2">
                                         <Checkbox checked={isSelected} />
-                                        {isSelected && (tool.quantity || 1) > 1 && (
+                                        {isSelected && availableQuantity > 1 && (
                                           <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                                             <button
                                               aria-label={`Decrease quantity for ${tool.name}`}
                                               className="h-8 w-8 rounded border flex items-center justify-center"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
+                                                const current = selectedTool?.quantity || 1;
                                                 const next = Math.max(1, current - 1);
-                                                updateSelectedToolQuantity(tool.id, next);
+                                                updateSelectedToolQuantity(bucketKey, next);
                                               }}
                                             >-</button>
-                                            <div className="w-12 text-center">{selectedTools.find(t => t.id === tool.id)?.quantity || 1}</div>
+                                            <div className="w-12 text-center">{selectedTool?.quantity || 1}</div>
                                             <button
                                               aria-label={`Increase quantity for ${tool.name}`}
                                               className="h-8 w-8 rounded border flex items-center justify-center"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
-                                                const max = tool.quantity || 1;
+                                                const current = selectedTool?.quantity || 1;
+                                                const max = availableQuantity;
                                                 const next = Math.min(max, current + 1);
-                                                updateSelectedToolQuantity(tool.id, next);
+                                                updateSelectedToolQuantity(bucketKey, next);
                                               }}
                                             >+</button>
                                           </div>

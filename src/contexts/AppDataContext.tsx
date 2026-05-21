@@ -46,7 +46,7 @@ interface AppDataContextType {
   projects: Project[];
   assignments: Assignment[];
   isLoading: boolean;
-  addTool: (tool: Omit<Tool, 'id'>) => void;
+  addTool: (tool: Omit<Tool, 'id'>) => Promise<void>;
   updateTool: (id: number, tool: Partial<Tool>) => void;
   deleteTool: (id: number) => void;
   addWorker: (worker: Omit<Worker, 'id'>) => void;
@@ -103,8 +103,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const addTool = async (tool: Omit<Tool, 'id'>) => {
     try {
-      const newTool = await apiClient.createTool(tool);
-      setTools([...tools, newTool]);
+      const newTools = await apiClient.createTool(tool);
+      setTools([...tools, ...newTools]);
     } catch (error) {
       console.error('Failed to add tool:', error);
       throw error;

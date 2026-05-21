@@ -115,26 +115,73 @@ export default function ToolsManager() {
     }
   }, []);
 
-  const filteredTools = tools
-    .filter(tool => {
-      const matchesCategory = categoryFilter === 'All' || tool.category === categoryFilter;
-      const matchesStatus = statusFilter === 'All' || tool.status === statusFilter;
-      const matches = matchesSearch(tool.name, searchQuery);
-      return matchesCategory && matchesStatus && matches;
-    })
-    .sort((a, b) => {
-      if (!sortField) return 0;
+  // We want to group tools into "Buckets" based on Name, Category, Brand, Model etc.
+  // For simplicity, we group by Name + Category + CustomAttributes (JSON stringified to easily compare)
+  type ToolBucket = {
+    key: string;
+    name: string;
+    category: string;
+    image: string | File | null | undefined;
+    customAttributes: Record<string, string>;
+    isCalibrable: boolean;
+    calibrationDue?: string;
+    totalCount: number;
+    availableCount: number;
+    instances: Tool[];
+    representativeTool: Tool;
+  };
 
-      let aValue = a[sortField];
-      let bValue = b[sortField];
+  const getBucketKey = (tool: Tool) => {
+    return `${tool.name}|${tool.category}|${JSON.stringify(tool.customAttributes)}`;
+  };
 
-      if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-      if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+  const filteredTools = tools.filter(tool => {
+    const matchesCategory = categoryFilter === 'All' || tool.category === categoryFilter;
+    const matchesStatus = statusFilter === 'All' || tool.status === statusFilter;
+    const matches = matchesSearch(tool.name, searchQuery);
+    return matchesCategory && matchesStatus && matches;
+  });
 
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
+  const toolBuckets: ToolBucket[] = [];
+  const bucketMap = new Map<string, ToolBucket>();
+
+  filteredTools.forEach(tool => {
+    const key = getBucketKey(tool);
+    if (!bucketMap.has(key)) {
+      bucketMap.set(key, {
+        key,
+        name: tool.name,
+        category: tool.category,
+        image: tool.image,
+        customAttributes: tool.customAttributes,
+        isCalibrable: tool.isCalibrable,
+        calibrationDue: tool.calibrationDue,
+        totalCount: 0,
+        availableCount: 0,
+        instances: [],
+        representativeTool: tool,
+      });
+      toolBuckets.push(bucketMap.get(key)!);
+    }
+    const bucket = bucketMap.get(key)!;
+    bucket.totalCount += 1;
+    // We consider "Available" as ready to checkout, maybe "Cal. Due" as well but usually Available
+    if (tool.status === 'Available') {
+      bucket.availableCount += 1;
+    }
+    bucket.instances.push(tool);
+  });
+
+  toolBuckets.sort((a, b) => {
+    if (!sortField) return 0;
+    let aValue = a[sortField as keyof ToolBucket];
+    let bValue = b[sortField as keyof ToolBucket];
+    if (typeof aValue === 'string') aValue = aValue.toLowerCase();
+    if (typeof bValue === 'string') bValue = bValue.toLowerCase();
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   const openDialog = (tool?: Tool) => {
     if (tool) {
@@ -352,31 +399,49 @@ export default function ToolsManager() {
     }
   };
 
+  const [instancesDialogOpen, setInstancesDialogOpen] = useState(false);
+  const [selectedBucket, setSelectedBucket] = useState<ToolBucket | null>(null);
+
+  const openInstancesDialog = (bucket: ToolBucket) => {
+    setSelectedBucket(bucket);
+    setInstancesDialogOpen(true);
+  };
+
   const handleExportExcel = () => {
     try {
       // The standard attributes that should get their own columns (excluding 'Custom')
       const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
 
-      // Map tools to row data
-      const data = filteredTools.map(tool => {
+      // Map tool buckets to row data to ensure quantity and instances match the UI properly
+      const data = toolBuckets.map(bucket => {
+        // Collect status counts for this bucket
+        const statusCounts: Record<string, number> = {};
+        bucket.instances.forEach(t => {
+          statusCounts[t.status] = (statusCounts[t.status] || 0) + 1;
+        });
+
         const row: Record<string, string | number> = {
-          'Name': tool.name,
-          'Category': tool.category,
-          'Status': tool.status,
-          'Quantity': (tool as ExtendedTool).quantity || 1,
-          'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
-          'Calibration Due': tool.calibrationDue || '',
-          'Certificate Number': (tool as ExtendedTool).certificateNumber || '',
+          'Name': bucket.name,
+          'Category': bucket.category,
+          'Total Stock': bucket.totalCount,
+          'Available': bucket.availableCount,
+          'In Use': statusCounts['In Use'] || 0,
+          'Damaged': statusCounts['Damaged'] || 0,
+          'Lost': statusCounts['Lost'] || 0,
+          'Cal. Due': statusCounts['Cal. Due'] || 0,
+          'Requires Calibration': bucket.isCalibrable ? 'Yes' : 'No',
+          'Calibration Due': bucket.calibrationDue || '',
+          'Certificate Number': (bucket.representativeTool as ExtendedTool).certificateNumber || '',
         };
 
         // Add standard custom attributes to primary columns
         standardKeys.forEach(key => {
-          row[key] = tool.customAttributes[key] || '';
+          row[key] = bucket.customAttributes[key] || '';
         });
 
         // Consolidate the rest of the custom attributes into a single string
         const extraInfo: string[] = [];
-        Object.entries(tool.customAttributes).forEach(([key, value]) => {
+        Object.entries(bucket.customAttributes).forEach(([key, value]) => {
           if (!standardKeys.includes(key)) {
             extraInfo.push(`${key}: ${value}`);
           }
@@ -563,7 +628,7 @@ export default function ToolsManager() {
       </div>
 
       {/* Tools Display */}
-      {filteredTools.length === 0 ? (
+      {toolBuckets.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <p className="text-center text-muted-foreground">No tools found</p>
@@ -576,74 +641,32 @@ export default function ToolsManager() {
               'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             }`}
         >
-          {filteredTools.map(tool => (
-            <Card key={tool.id} className="hover:shadow-lg transition-all hover:scale-105 flex flex-col h-full">
+          {toolBuckets.map(bucket => (
+            <Card key={bucket.key} className="hover:shadow-lg transition-all hover:scale-105 flex flex-col h-full">
               <CardHeader className="flex-shrink-0">
                 <div className="aspect-square mb-4 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                  {tool.image ? (
-                    <img src={getUploadUrl(tool.image as string)} alt={tool.name} className="w-full h-full object-cover" />
+                  {bucket.image ? (
+                    <img src={getUploadUrl(bucket.image as string)} alt={bucket.name} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-6xl">🔧</span>
                   )}
                 </div>
-                <CardTitle className="text-lg">{tool.name}</CardTitle>
+                <CardTitle className="text-lg">{bucket.name}</CardTitle>
                 <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline">{tool.category}</Badge>
-                  {/* Status badge with optional tooltip when In Use */}
-                  {tool.status === 'In Use' ? (
-                    (() => {
-                      // Build assignment breakdown for this tool (ACTIVE assignments only)
-                      const entries: Array<{ projectName: string; qty: number }> = [];
-                      assignments.forEach(asg => {
-                        if (asg.status === 'active') {
-                          asg.tools.forEach(t => {
-                            if (t.id === tool.id && (t.quantity || 1) > 0) {
-                              entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-                            }
-                          });
-                        }
-                      });
-
-                      const hasEntries = entries.length > 0;
-
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                            </span>
-                          </TooltipTrigger>
-                          {hasEntries && (
-                            <TooltipContent>
-                              <div className="space-y-1">
-                                {entries.map((e, i) => (
-                                  <div key={i} className="text-sm">
-                                    <strong>{e.projectName}</strong>: {e.qty}
-                                  </div>
-                                ))}
-                              </div>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      );
-                    })()
-                  ) : (
-                    <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                  )}
-                  {/* Show quantity only when > 1 */}
-                  {(() => {
-                    const qty = (tool as ExtendedTool).quantity;
-                    return qty !== undefined && qty !== null && qty > 1;
-                  })() && (
-                      <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                    )}
+                  <Badge variant="outline">{bucket.category}</Badge>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                    {bucket.availableCount} Available
+                  </Badge>
+                  <Badge variant="outline">
+                    Total: {bucket.totalCount}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
                 <div className="flex-1">
-                  {Object.entries(tool.customAttributes).length > 0 && (
+                  {Object.entries(bucket.customAttributes).length > 0 && (
                     <div className="space-y-1 mb-4">
-                      {Object.entries(tool.customAttributes).map(([key, value]) => (
+                      {Object.entries(bucket.customAttributes).map(([key, value]) => (
                         <p key={key} className="text-sm text-muted-foreground">
                           <span className="font-medium">{key}:</span> {value}
                         </p>
@@ -651,22 +674,15 @@ export default function ToolsManager() {
                     </div>
                   )}
 
-                  {renderCalibrationStatus(tool)}
+                  {renderCalibrationStatus(bucket.representativeTool)}
 
                 </div>
 
                 {/* Action buttons fixed to bottom */}
                 <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" onClick={() => openDialog(tool)} className="flex-1">
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDeleteAttempt(tool.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
+                  <Button variant="outline" size="sm" onClick={() => openInstancesDialog(bucket)} className="flex-1">
+                    <List className="mr-2 h-4 w-4" />
+                    Manage Instances
                   </Button>
                 </div>
               </CardContent>
@@ -676,14 +692,14 @@ export default function ToolsManager() {
       ) : (
         /* List View */
         <div className="space-y-3">
-          {filteredTools.map(tool => (
-            <Card key={tool.id} className="hover:shadow-md transition-all">
+          {toolBuckets.map(bucket => (
+            <Card key={bucket.key} className="hover:shadow-md transition-all">
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
                   {/* Tool Image/Icon */}
                   <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {tool.image ? (
-                      <img src={getUploadUrl(tool.image as string)} alt={tool.name} className="w-full h-full object-cover" />
+                    {bucket.image ? (
+                      <img src={getUploadUrl(bucket.image as string)} alt={bucket.name} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-2xl">🔧</span>
                     )}
@@ -693,79 +709,31 @@ export default function ToolsManager() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="font-semibold text-lg">{tool.name}</h3>
+                        <h3 className="font-semibold text-lg">{bucket.name}</h3>
                         <div className="flex gap-2 mt-1">
-                          <Badge variant="outline">{tool.category}</Badge>
-                          {tool.status === 'In Use' ? (
-                            (() => {
-                              // Build assignment breakdown for this tool (ACTIVE assignments only)
-                              const entries: Array<{ projectName: string; qty: number }> = [];
-                              assignments.forEach(asg => {
-                                if (asg.status === 'active') {
-                                  asg.tools.forEach(t => {
-                                    if (t.id === tool.id && (t.quantity || 1) > 0) {
-                                      entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-                                    }
-                                  });
-                                }
-                              });
-
-                              const hasEntries = entries.length > 0;
-
-                              return (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                                    </span>
-                                  </TooltipTrigger>
-                                  {hasEntries && (
-                                    <TooltipContent>
-                                      <div className="space-y-1">
-                                        {entries.map((e, i) => (
-                                          <div key={i} className="text-sm">
-                                            <strong>{e.projectName}</strong>: {e.qty}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              );
-                            })()
-                          ) : (
-                            <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                          )}
-                          {/* Show quantity only when > 1 */}
-                          {(() => {
-                            const qty = (tool as ExtendedTool).quantity;
-                            return qty !== undefined && qty !== null && qty > 1;
-                          })() && (
-                              <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                            )}
+                          <Badge variant="outline">{bucket.category}</Badge>
+                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                            {bucket.availableCount} Available
+                          </Badge>
+                          <Badge variant="outline">
+                            Total: {bucket.totalCount}
+                          </Badge>
                         </div>
                       </div>
 
                       {/* Action buttons */}
                       <div className="flex gap-2 ml-4">
-                        <Button variant="outline" size="sm" onClick={() => openDialog(tool)}>
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteAttempt(tool.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="outline" size="sm" onClick={() => openInstancesDialog(bucket)}>
+                          <List className="h-4 w-4 mr-1" />
+                          Manage Instances
                         </Button>
                       </div>
                     </div>
 
                     {/* Custom Attributes */}
-                    {Object.entries(tool.customAttributes).length > 0 && (
+                    {Object.entries(bucket.customAttributes).length > 0 && (
                       <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
-                        {Object.entries(tool.customAttributes).map(([key, value]) => (
+                        {Object.entries(bucket.customAttributes).map(([key, value]) => (
                           <span key={key}>
                             <span className="font-medium">{key}:</span> {value}
                           </span>
@@ -774,7 +742,7 @@ export default function ToolsManager() {
                     )}
 
                     {/* Calibration Info */}
-                    {renderCalibrationStatus(tool)}
+                    {renderCalibrationStatus(bucket.representativeTool)}
 
                   </div>
                 </div>
@@ -1043,6 +1011,49 @@ export default function ToolsManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Instances Dialog */}
+      <Dialog open={instancesDialogOpen} onOpenChange={setInstancesDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Manage Instances: {selectedBucket?.name}</DialogTitle>
+            <DialogDescription>
+              View and edit individual physical instances of this tool model.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 py-4">
+            {selectedBucket?.instances.map((instance, index) => (
+              <div key={instance.id} className="flex items-center justify-between p-4 border rounded-lg bg-card text-card-foreground shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center font-bold text-sm">
+                    #{index + 1}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">ID: {instance.id}</p>
+                    <p className="text-xs text-muted-foreground">Status: <Badge variant={getStatusBadgeVariant(instance.status)} className="ml-1">{instance.status}</Badge></p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setInstancesDialogOpen(false); openDialog(instance); }}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Instance
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => { setInstancesDialogOpen(false); handleDeleteAttempt(instance.id); }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {(!selectedBucket || selectedBucket.instances.length === 0) && (
+               <p className="text-center text-muted-foreground py-8">No instances found for this tool.</p>
+            )}
+          </div>
+          <DialogFooter className="pt-4 border-t">
+             <Button variant="outline" onClick={() => setInstancesDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

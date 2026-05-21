@@ -78,42 +78,53 @@ router.get('/:id', async (req, res) => {
 // POST /api/tools - Create new tool
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-  const { name, category, status = 'Available', isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl } = req.body;
+    const { name, category, status = 'Available', isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl } = req.body;
     // Handle both file uploads and URL inputs
     const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl || null);
-  // Coerce isCalibrable which may come as string from FormData
-  const isCalibrableFlag = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
+    // Coerce isCalibrable which may come as string from FormData
+    const isCalibrableFlag = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
 
-    const result = await runQuery(`
-      INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
-      name,
-      category,
-      status,
-      isCalibrableFlag ? 1 : 0,
-      calibrationDue || null,
-      certificateNumber || null,
-      typeof quantity !== 'undefined' ? Number(quantity) : 1,
-      image,
-      customAttributes || '{}'
-    ]);
+    const qty = typeof quantity !== 'undefined' ? Number(quantity) : 1;
+    let createdTools = [];
 
-    const newTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
-      FROM tools
-      WHERE id = ?
-    `, [result.id]);
+    // Since we want each physical tool to be its own row with quantity=1,
+    // we loop and insert `qty` times.
+    for (let i = 0; i < qty; i++) {
+      const result = await runQuery(`
+        INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        name,
+        category,
+        status,
+        isCalibrableFlag ? 1 : 0,
+        calibrationDue || null,
+        certificateNumber || null,
+        1, // ALWAYS 1 per row now
+        image,
+        customAttributes || '{}'
+      ]);
 
-    const parsedTool = {
-      ...newTool,
-      isCalibrable: Boolean(Number(newTool.isCalibrable)),
-      certificateNumber: newTool.certificateNumber || null,
-      quantity: newTool.quantity !== undefined && newTool.quantity !== null ? Number(newTool.quantity) : undefined,
-      customAttributes: newTool.customAttributes ? JSON.parse(newTool.customAttributes) : {}
-    };
+      const newTool = await getQuery(`
+        SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
+        FROM tools
+        WHERE id = ?
+      `, [result.id]);
 
-    res.status(201).json(parsedTool);
+      createdTools.push({
+        ...newTool,
+        isCalibrable: Boolean(Number(newTool.isCalibrable)),
+        certificateNumber: newTool.certificateNumber || null,
+        quantity: newTool.quantity !== undefined && newTool.quantity !== null ? Number(newTool.quantity) : undefined,
+        customAttributes: newTool.customAttributes ? JSON.parse(newTool.customAttributes) : {}
+      });
+    }
+
+    // We can only return one object in standard REST usually, or an array.
+    // The frontend's addTool probably expects a single tool back.
+    // To not break `setTools([...tools, newTool])` we might need to change frontend to handle an array
+    // Or we return the array and frontend handles it. Let's return the array.
+    res.status(201).json(createdTools);
   } catch (error) {
     console.error('Error creating tool:', error);
     res.status(500).json({ error: 'Failed to create tool' });

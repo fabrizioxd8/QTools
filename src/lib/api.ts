@@ -51,7 +51,7 @@ class ApiClient {
     return this.request<Tool>(`/tools/${id}`);
   }
 
-  async createTool(tool: Omit<Tool, 'id'>): Promise<Tool> {
+  async createTool(tool: Omit<Tool, 'id'>): Promise<Tool[]> {
     // Create FormData for proper file/data handling
     const formData = new FormData();
     
@@ -87,7 +87,7 @@ class ApiClient {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json() as Tool;
+      return await response.json() as Tool[];
     } catch (error) {
       console.error(`API request failed: ${url}`, error);
       throw error;
