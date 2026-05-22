@@ -118,7 +118,20 @@ export default function ToolsManager() {
   const filteredTools = tools
     .filter(tool => {
       const matchesCategory = categoryFilter === 'All' || tool.category === categoryFilter;
-      const matchesStatus = statusFilter === 'All' || tool.status === statusFilter;
+      let matchesStatus = false;
+
+      if (statusFilter === 'All') {
+        matchesStatus = true;
+      } else if (statusFilter === 'Damaged') {
+        matchesStatus = tool.status === 'Damaged' || (tool.damagedQuantity && tool.damagedQuantity > 0);
+      } else if (statusFilter === 'Lost') {
+        matchesStatus = tool.status === 'Lost' || (tool.lostQuantity && tool.lostQuantity > 0);
+      } else if (statusFilter === 'Available') {
+        matchesStatus = tool.status === 'Available' || (tool.quantity && tool.quantity > 0);
+      } else {
+        matchesStatus = tool.status === statusFilter;
+      }
+
       const matches = matchesSearch(tool.name, searchQuery);
       return matchesCategory && matchesStatus && matches;
     })
@@ -630,13 +643,31 @@ export default function ToolsManager() {
                   ) : (
                     <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                   )}
-                  {/* Show quantity only when > 1 */}
+                  {/* Show quantity based on filter or if > 1 */}
                   {(() => {
-                    const qty = (tool as ExtendedTool).quantity;
-                    return qty !== undefined && qty !== null && qty > 1;
-                  })() && (
-                      <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                    )}
+                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                    let displayQty = extTool.quantity;
+                    let prefix = "Qty";
+
+                    if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                      displayQty = extTool.damagedQuantity;
+                      prefix = "Damaged Qty";
+                    } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                      displayQty = extTool.lostQuantity;
+                      prefix = "Lost Qty";
+                    } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                      displayQty = extTool.quantity;
+                    }
+
+                    // Always show if filtering by Damaged or Lost and there is quantity
+                    if ((statusFilter === 'Damaged' || statusFilter === 'Lost') && displayQty !== undefined && displayQty > 0) {
+                      return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
+                    }
+
+                    return displayQty !== undefined && displayQty !== null && displayQty > 1 ? (
+                      <Badge variant="outline">{prefix}: {displayQty}</Badge>
+                    ) : null;
+                  })()}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
@@ -736,13 +767,31 @@ export default function ToolsManager() {
                           ) : (
                             <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                           )}
-                          {/* Show quantity only when > 1 */}
+                          {/* Show quantity based on filter or if > 1 */}
                           {(() => {
-                            const qty = (tool as ExtendedTool).quantity;
-                            return qty !== undefined && qty !== null && qty > 1;
-                          })() && (
-                              <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                            )}
+                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                            let displayQty = extTool.quantity;
+                            let prefix = "Qty";
+
+                            if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                              displayQty = extTool.damagedQuantity;
+                              prefix = "Damaged Qty";
+                            } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                              displayQty = extTool.lostQuantity;
+                              prefix = "Lost Qty";
+                            } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                              displayQty = extTool.quantity;
+                            }
+
+                            // Always show if filtering by Damaged or Lost and there is quantity
+                            if ((statusFilter === 'Damaged' || statusFilter === 'Lost') && displayQty !== undefined && displayQty > 0) {
+                              return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
+                            }
+
+                            return displayQty !== undefined && displayQty !== null && displayQty > 1 ? (
+                              <Badge variant="outline">{prefix}: {displayQty}</Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
 

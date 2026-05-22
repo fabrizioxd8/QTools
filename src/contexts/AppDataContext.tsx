@@ -10,6 +10,8 @@ export interface Tool {
   calibrationDue?: string;
   certificateNumber?: string;
   quantity?: number;
+  damagedQuantity?: number;
+  lostQuantity?: number;
   // image can be a URL (string) or a File when the user selects one locally
   image?: string | File | null;
   customAttributes: Record<string, string>;

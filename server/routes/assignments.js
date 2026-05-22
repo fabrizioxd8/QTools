@@ -256,60 +256,51 @@ router.put('/:id/checkin', async (req, res) => {
       `, [finalCheckinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), assignmentId]);
 
       // Update tool statuses based on conditions
-      const damagedLostOrMissing = new Set();
-      if (toolConditions) {
-        for (const [toolId, condition] of Object.entries(toolConditions)) {
-          if (condition === 'damaged' || condition === 'lost' || condition === 'missing') {
-            let newStatus;
-            if (condition === 'damaged') newStatus = 'Damaged';
-            else if (condition === 'lost') newStatus = 'Lost';
-            else if (condition === 'missing') newStatus = 'In Use'; // Keep as In Use if missing
-            
-            await runQuery(`UPDATE tools SET status = ? WHERE id = ?`, [newStatus, toolId]);
-            damagedLostOrMissing.add(Number(toolId));
-          }
-        }
-      }
-
       // Restore quantities for tools assigned to this assignment
       for (const toolRecord of toolsInAssignment) {
         const { toolId, checkoutQuantity, currentToolQuantity } = toolRecord;
         const condition = toolConditions ? toolConditions[toolId] : 'good';
+        const restoreAmount = checkoutQuantity || 0;
         
-        // Only restore quantity if tool is not lost or missing
-        if (condition !== 'lost' && condition !== 'missing') {
-          // Explicitly restore the quantity by adding back what was checked out
-          const restoreAmount = checkoutQuantity || 0;
+        if (condition === 'good') {
           await runQuery(
             `UPDATE tools SET quantity = quantity + ? WHERE id = ?`,
             [restoreAmount, toolId]
           );
-          
-          console.log(`[CHECK-IN] Tool ${toolId}: restored ${restoreAmount} units (was ${currentToolQuantity})`);
+        } else if (condition === 'damaged') {
+          await runQuery(
+            `UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`,
+            [restoreAmount, toolId]
+          );
         } else if (condition === 'lost') {
-          // If lost, don't restore - tool is permanently gone
-          console.log(`[CHECK-IN] Tool ${toolId}: marked as LOST, quantity not restored`);
+          await runQuery(
+            `UPDATE tools SET lostQuantity = lostQuantity + ? WHERE id = ?`,
+            [restoreAmount, toolId]
+          );
         } else if (condition === 'missing') {
-          // If missing, don't restore - tool is still missing
-          console.log(`[CHECK-IN] Tool ${toolId}: marked as MISSING, quantity not restored`);
+          // Keep as missing, do not restore
         }
 
-        // Update status to Available if:
-        // 1. Tool was not damaged/lost/missing
-        // 2. There are NO other active assignments using this tool
-        if (condition !== 'damaged' && condition !== 'lost' && condition !== 'missing') {
-          const activeCountRow = await getQuery(
-            `SELECT COUNT(*) as cnt FROM assignment_tools at 
-             JOIN assignments a ON at.assignmentId = a.id 
-             WHERE at.toolId = ? AND a.status = 'active' AND a.id != ?`,
-            [toolId, assignmentId]
-          );
-          const activeCount = activeCountRow ? activeCountRow.cnt : 0;
-          if (!activeCount || Number(activeCount) === 0) {
-            await runQuery(`UPDATE tools SET status = 'Available' WHERE id = ?`, [toolId]);
-            console.log(`[CHECK-IN] Tool ${toolId}: status updated to Available`);
-          }
+        // Re-evaluate tool status
+        const activeCountRow = await getQuery(
+          `SELECT COUNT(*) as cnt FROM assignment_tools at
+           JOIN assignments a ON at.assignmentId = a.id
+           WHERE at.toolId = ? AND a.status = 'active' AND a.id != ?`,
+          [toolId, assignmentId]
+        );
+        const activeCount = activeCountRow ? activeCountRow.cnt : 0;
+
+        const toolStats = await getQuery(`SELECT quantity, damagedQuantity, lostQuantity FROM tools WHERE id = ?`, [toolId]);
+        let finalStatus = 'Available';
+        if (activeCount > 0 || (condition === 'missing')) {
+          finalStatus = 'In Use';
+        } else if (toolStats.quantity === 0 && toolStats.damagedQuantity > 0) {
+          finalStatus = 'Damaged';
+        } else if (toolStats.quantity === 0 && toolStats.lostQuantity > 0 && toolStats.damagedQuantity === 0) {
+          finalStatus = 'Lost';
         }
+
+        await runQuery(`UPDATE tools SET status = ? WHERE id = ?`, [finalStatus, toolId]);
       }
 
       await runQuery('COMMIT');

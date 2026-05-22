@@ -30,6 +30,8 @@ export const initializeDatabase = () => {
       calibrationDue TEXT,
       certificateNumber TEXT,
       quantity INTEGER DEFAULT 1,
+      damagedQuantity INTEGER DEFAULT 0,
+      lostQuantity INTEGER DEFAULT 0,
       image TEXT,
       customAttributes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -137,6 +139,8 @@ const runMigrations = () => {
 
     const hasCertificate = columns.some(col => col.name === 'certificateNumber');
     const hasQuantity = columns.some(col => col.name === 'quantity');
+    const hasDamagedQuantity = columns.some(col => col.name === 'damagedQuantity');
+    const hasLostQuantity = columns.some(col => col.name === 'lostQuantity');
 
     if (!hasCertificate) {
       console.log('\u2699\ufe0f Adding certificateNumber column to tools table...');
@@ -151,6 +155,22 @@ const runMigrations = () => {
       db.run("ALTER TABLE tools ADD COLUMN quantity INTEGER DEFAULT 1", (err) => {
         if (err) console.error('Error adding quantity column:', err);
         else console.log('\u2705 quantity column added successfully');
+      });
+    }
+
+    if (!hasDamagedQuantity) {
+      console.log('\u2699\ufe0f Adding damagedQuantity column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN damagedQuantity INTEGER DEFAULT 0", (err) => {
+        if (err) console.error('Error adding damagedQuantity column:', err);
+        else console.log('\u2705 damagedQuantity column added successfully');
+      });
+    }
+
+    if (!hasLostQuantity) {
+      console.log('\u2699\ufe0f Adding lostQuantity column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN lostQuantity INTEGER DEFAULT 0", (err) => {
+        if (err) console.error('Error adding lostQuantity column:', err);
+        else console.log('\u2705 lostQuantity column added successfully');
       });
     }
   });
