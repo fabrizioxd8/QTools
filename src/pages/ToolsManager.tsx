@@ -370,34 +370,80 @@ export default function ToolsManager() {
       // The standard attributes that should get their own columns (excluding 'Custom')
       const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
 
-      // Map tools to row data
-      const data = filteredTools.map(tool => {
-        const row: Record<string, string | number> = {
-          'Name': tool.name,
-          'Category': tool.category,
-          'Status': tool.status,
-          'Quantity': (tool as ExtendedTool).quantity || 1,
-          'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
-          'Calibration Due': tool.calibrationDue || '',
-          'Certificate Number': (tool as ExtendedTool).certificateNumber || '',
+      // Expand tools into rows based on quantity fields if filtering by 'All'
+      const data: Record<string, string | number>[] = [];
+      const toolsToExport = statusFilter === 'All' ? tools : filteredTools;
+
+      toolsToExport.forEach(tool => {
+        const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+
+        // Base row data
+        const getBaseRow = (status: string, qty: number): Record<string, string | number> => {
+          const row: Record<string, string | number> = {
+            'Name': tool.name,
+            'Category': tool.category,
+            'Status': status,
+            'Quantity': qty,
+            'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
+            'Calibration Due': tool.calibrationDue || '',
+            'Certificate Number': extTool.certificateNumber || '',
+          };
+
+          standardKeys.forEach(key => {
+            row[key] = tool.customAttributes[key] || '';
+          });
+
+          const extraInfo: string[] = [];
+          Object.entries(tool.customAttributes).forEach(([key, value]) => {
+            if (!standardKeys.includes(key)) {
+              extraInfo.push(`${key}: ${value}`);
+            }
+          });
+          row['EXTRA INFORMATION'] = extraInfo.join(' | ');
+          return row;
         };
 
-        // Add standard custom attributes to primary columns
-        standardKeys.forEach(key => {
-          row[key] = tool.customAttributes[key] || '';
-        });
+        // If filtering by 'All', expand rows
+        if (statusFilter === 'All') {
+          let hasExported = false;
+          // Note: In Use status is inferred from assignments, but tool.status may track this.
+          // In the database, status changes to "In Use" if a unit is checked out.
+          // For simplicity, we just use the raw tool.status if quantity > 0,
+          // or fallback to Available.
+          const mainStatus = tool.status === 'In Use' ? 'In Use' : 'Available';
 
-        // Consolidate the rest of the custom attributes into a single string
-        const extraInfo: string[] = [];
-        Object.entries(tool.customAttributes).forEach(([key, value]) => {
-          if (!standardKeys.includes(key)) {
-            extraInfo.push(`${key}: ${value}`);
+          if (extTool.quantity !== undefined && extTool.quantity > 0) {
+            data.push(getBaseRow(mainStatus, extTool.quantity));
+            hasExported = true;
           }
-        });
+          if (extTool.damagedQuantity !== undefined && extTool.damagedQuantity > 0) {
+            data.push(getBaseRow('Damaged', extTool.damagedQuantity));
+            hasExported = true;
+          }
+          if (extTool.lostQuantity !== undefined && extTool.lostQuantity > 0) {
+            data.push(getBaseRow('Lost', extTool.lostQuantity));
+            hasExported = true;
+          }
 
-        row['EXTRA INFORMATION'] = extraInfo.join(' | ');
+          // Fallback if all quantities are 0 but the tool exists
+          if (!hasExported) {
+            data.push(getBaseRow(tool.status, extTool.quantity || 1));
+          }
+        } else {
+          // If filtered, just export based on current view
+          let displayQty = extTool.quantity;
+          let displayStatus = tool.status;
 
-        return row;
+          if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+            displayQty = extTool.damagedQuantity;
+            displayStatus = 'Damaged';
+          } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+            displayQty = extTool.lostQuantity;
+            displayStatus = 'Lost';
+          }
+
+          data.push(getBaseRow(displayStatus, displayQty || 1));
+        }
       });
 
       // Create worksheet and workbook
