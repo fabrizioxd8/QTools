@@ -21,7 +21,7 @@ import { useAppData, Assignment } from '@/contexts/AppDataContext';
 import { toast } from 'sonner';
 
 export default function ActiveAssignments() {
-  const { assignments, checkInAssignment } = useAppData();
+  const { assignments, checkInAssignment } = useAppData() as any;
   const [checkInDialog, setCheckInDialog] = useState<Assignment | null>(null);
   const [toolConditions, setToolConditions] = useState<Record<number, 'good' | 'damaged' | 'lost' | 'missing'>>({});
   const [editingCompletedAssignment, setEditingCompletedAssignment] = useState<Assignment | null>(null);
@@ -40,7 +40,8 @@ export default function ActiveAssignments() {
     const d = new Date();
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
   });
   const checkInTopRef = useState<HTMLDivElement | null>(null)[0] as unknown as React.RefObject<HTMLDivElement>;
 
@@ -88,7 +89,8 @@ export default function ActiveAssignments() {
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
-    setCheckinTime(`${hh}:${mm}`);
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    setCheckinTime(`${hh}:${mm}:${ss}`);
     // ensure dialog scroll/focus at top after open
     setTimeout(() => {
       const el = document.getElementById('checkin-top');
@@ -105,8 +107,8 @@ export default function ActiveAssignments() {
         let checkinDateTime: string | undefined;
         if (checkinDate) {
           const [year, month, day] = checkinDate.split('-').map(Number);
-          const [hour, minute] = (checkinTime || '00:00').split(':').map(Number);
-          checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0).toISOString();
+          const [hour, minute, second] = (checkinTime || '00:00:00').split(':').map(Number);
+          checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, second ?? 0).toISOString();
         }
 
         await checkInAssignment(checkInDialog.id, checkinDateTime, checkinNotes, toolConditions);
@@ -127,8 +129,8 @@ export default function ActiveAssignments() {
         let checkinDateTime: string | undefined;
         if (checkinDate) {
           const [year, month, day] = checkinDate.split('-').map(Number);
-          const [hour, minute] = (checkinTime || '00:00').split(':').map(Number);
-          checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0).toISOString();
+          const [hour, minute, second] = (checkinTime || '00:00:00').split(':').map(Number);
+          checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, second ?? 0).toISOString();
         }
 
         await checkInAssignment(editingCompletedAssignment.id, checkinDateTime, checkinNotes, toolConditions);
@@ -388,7 +390,8 @@ export default function ActiveAssignments() {
                               setCheckinDate(`${year}-${month}-${day}`);
                               const hh = String(date.getHours()).padStart(2, '0');
                               const mm = String(date.getMinutes()).padStart(2, '0');
-                              setCheckinTime(`${hh}:${mm}`);
+                              const ss = String(date.getSeconds()).padStart(2, '0');
+                              setCheckinTime(`${hh}:${mm}:${ss}`);
                             }
                           }}
                         >
@@ -410,7 +413,7 @@ export default function ActiveAssignments() {
                                 <Badge key={tool.id} className={getConditionBadgeClass(condition)}>
                                   <ConditionIcon className="mr-1 h-3 w-3" />
                                   {tool.name} ({condition})
-                                      {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
+                                  {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
                                 </Badge>
                               );
                             })}
@@ -524,6 +527,7 @@ export default function ActiveAssignments() {
                       <Input
                         id="checkin-time"
                         type="time"
+                        step="1"
                         value={checkinTime}
                         onChange={(e) => setCheckinTime(e.target.value)}
                         className="w-auto h-11 max-w-[140px]"
@@ -636,6 +640,7 @@ export default function ActiveAssignments() {
                       <Input
                         id="edit-checkin-time"
                         type="time"
+                        step="1"
                         value={checkinTime}
                         onChange={(e) => setCheckinTime(e.target.value)}
                         className="w-auto h-11 max-w-[140px]"

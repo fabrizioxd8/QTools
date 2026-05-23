@@ -96,9 +96,9 @@ export default function Reports() {
       statusLabel?: string;
     }> = [];
 
-    const conditionLabel = (condition?: 'good' | 'damaged' | 'lost' | 'missing') => {
-      if (!condition || condition === 'good') return undefined;
-      return `Status: ${condition.charAt(0).toUpperCase() + condition.slice(1)}`;
+    const conditionLabel = (condition?: 'good' | 'damaged' | 'lost' | 'missing' | string) => {
+      const cond = condition || 'good';
+      return `Status: ${cond.charAt(0).toUpperCase() + cond.slice(1)}`;
     };
 
     assignments.forEach(assignment => {
@@ -124,6 +124,7 @@ export default function Reports() {
           serie: attributes.serie,
           quantity,
           extraDetails,
+          statusLabel: conditionLabel('good'),
         });
       });
 
@@ -228,11 +229,13 @@ export default function Reports() {
     model?: string;
     serie?: string;
     extraDetails: Record<string, string>;
+    statusLabel?: string;
   }) => {
     const detailLines = [
       item.brand ? `Brand: ${item.brand}` : undefined,
       item.model ? `Model: ${item.model}` : undefined,
       item.serie ? `Serie: ${item.serie}` : undefined,
+      item.statusLabel ? `<strong>${item.statusLabel}</strong>` : undefined,
       ...Object.entries(item.extraDetails).map(([key, value]) => `${key}: ${value}`),
     ].filter(Boolean);
 
@@ -722,6 +725,11 @@ export default function Reports() {
                             <p className="text-xs text-muted-foreground">
                               {[log.brand, log.model, log.serie].filter(Boolean).join(' • ')}
                             </p>
+                            {log.statusLabel && (
+                              <Badge variant={log.statusLabel === 'Status: Good' ? 'outline' : 'destructive'} className="mt-1">
+                                {log.statusLabel}
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

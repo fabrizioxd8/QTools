@@ -226,12 +226,17 @@ router.put('/:id/checkin', async (req, res) => {
 
     // Fetch assignment details BEFORE making changes
     const assignmentBefore = await getQuery(`
-      SELECT id, status FROM assignments WHERE id = ?
+      SELECT id, status, toolConditions FROM assignments WHERE id = ?
     `, [assignmentId]);
 
-    if (!assignmentBefore || assignmentBefore.status === 'completed') {
-      return res.status(400).json({ error: 'Assignment is already completed or does not exist' });
+    if (!assignmentBefore) {
+      return res.status(400).json({ error: 'Assignment does not exist' });
     }
+    
+    const isAlreadyCompleted = assignmentBefore.status === 'completed';
+    const oldToolConditions = isAlreadyCompleted && assignmentBefore.toolConditions 
+      ? JSON.parse(assignmentBefore.toolConditions) 
+      : {};
 
     // Get all tools for this assignment with their checkout quantities
     const toolsInAssignment = await allQuery(`
@@ -262,23 +267,46 @@ router.put('/:id/checkin', async (req, res) => {
         const condition = toolConditions ? toolConditions[toolId] : 'good';
         const restoreAmount = checkoutQuantity || 0;
         
-        if (condition === 'good') {
-          await runQuery(
-            `UPDATE tools SET quantity = quantity + ? WHERE id = ?`,
-            [restoreAmount, toolId]
-          );
-        } else if (condition === 'damaged') {
-          await runQuery(
-            `UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`,
-            [restoreAmount, toolId]
-          );
-        } else if (condition === 'lost') {
-          await runQuery(
-            `UPDATE tools SET lostQuantity = lostQuantity + ? WHERE id = ?`,
-            [restoreAmount, toolId]
-          );
-        } else if (condition === 'missing') {
-          // Keep as missing, do not restore
+        if (isAlreadyCompleted) {
+          const oldCondition = oldToolConditions[toolId] || 'good';
+          if (oldCondition !== condition) {
+            // Revert old condition
+            if (oldCondition === 'good') {
+              await runQuery(`UPDATE tools SET quantity = quantity - ? WHERE id = ?`, [restoreAmount, toolId]);
+            } else if (oldCondition === 'damaged') {
+              await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity - ? WHERE id = ?`, [restoreAmount, toolId]);
+            } else if (oldCondition === 'lost') {
+              await runQuery(`UPDATE tools SET lostQuantity = lostQuantity - ? WHERE id = ?`, [restoreAmount, toolId]);
+            }
+            
+            // Apply new condition
+            if (condition === 'good') {
+              await runQuery(`UPDATE tools SET quantity = quantity + ? WHERE id = ?`, [restoreAmount, toolId]);
+            } else if (condition === 'damaged') {
+              await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`, [restoreAmount, toolId]);
+            } else if (condition === 'lost') {
+              await runQuery(`UPDATE tools SET lostQuantity = lostQuantity + ? WHERE id = ?`, [restoreAmount, toolId]);
+            }
+          }
+        } else {
+          if (condition === 'good') {
+            await runQuery(
+              `UPDATE tools SET quantity = quantity + ? WHERE id = ?`,
+              [restoreAmount, toolId]
+            );
+          } else if (condition === 'damaged') {
+            await runQuery(
+              `UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`,
+              [restoreAmount, toolId]
+            );
+          } else if (condition === 'lost') {
+            await runQuery(
+              `UPDATE tools SET lostQuantity = lostQuantity + ? WHERE id = ?`,
+              [restoreAmount, toolId]
+            );
+          } else if (condition === 'missing') {
+            // Keep as missing, do not restore
+          }
         }
 
         // Re-evaluate tool status

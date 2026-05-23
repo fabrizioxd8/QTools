@@ -34,7 +34,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     const d = new Date();
     const hh = String(d.getHours()).padStart(2, '0');
     const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return `${hh}:${mm}:${ss}`;
   });
 
   // Search input refs
@@ -115,8 +116,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
       try {
         // Build local date+time from selected date and time
         const [year, month, day] = checkoutDate.split('-').map(Number);
-        const [hour, minute] = checkoutTime.split(':').map(Number);
-        const checkoutDateObj = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, 0);
+        const [hour, minute, second] = checkoutTime.split(':').map(Number);
+        const checkoutDateObj = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, second ?? 0);
 
         await createAssignment({
           checkoutDate: checkoutDateObj.toISOString(),
@@ -273,33 +274,33 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
-                                        <Checkbox checked={isSelected} />
-                                        {isSelected && (tool.quantity || 1) > 1 && (
-                                          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
-                                            <button
-                                              aria-label={`Decrease quantity for ${tool.name}`}
-                                              className="h-8 w-8 rounded border flex items-center justify-center"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
-                                                const next = Math.max(1, current - 1);
-                                                updateSelectedToolQuantity(tool.id, next);
-                                              }}
-                                            >-</button>
-                                            <div className="w-12 text-center">{selectedTools.find(t => t.id === tool.id)?.quantity || 1}</div>
-                                            <button
-                                              aria-label={`Increase quantity for ${tool.name}`}
-                                              className="h-8 w-8 rounded border flex items-center justify-center"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
-                                                const max = tool.quantity || 1;
-                                                const next = Math.min(max, current + 1);
-                                                updateSelectedToolQuantity(tool.id, next);
-                                              }}
-                                            >+</button>
-                                          </div>
-                                        )}
+                              <Checkbox checked={isSelected} />
+                              {isSelected && (tool.quantity || 1) > 1 && (
+                                <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    aria-label={`Decrease quantity for ${tool.name}`}
+                                    className="h-8 w-8 rounded border flex items-center justify-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
+                                      const next = Math.max(1, current - 1);
+                                      updateSelectedToolQuantity(tool.id, next);
+                                    }}
+                                  >-</button>
+                                  <div className="w-12 text-center">{selectedTools.find(t => t.id === tool.id)?.quantity || 1}</div>
+                                  <button
+                                    aria-label={`Increase quantity for ${tool.name}`}
+                                    className="h-8 w-8 rounded border flex items-center justify-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
+                                      const max = tool.quantity || 1;
+                                      const next = Math.min(max, current + 1);
+                                      updateSelectedToolQuantity(tool.id, next);
+                                    }}
+                                  >+</button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </CardHeader>
@@ -510,6 +511,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                     <Input
                       id="checkout-time"
                       type="time"
+                      step="1"
                       value={checkoutTime}
                       onChange={(e) => setCheckoutTime(e.target.value)}
                       className="w-auto h-11 max-w-[140px]"

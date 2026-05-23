@@ -649,8 +649,19 @@ export default function ToolsManager() {
                 <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline">{tool.category}</Badge>
                   {/* Status badge with optional tooltip when In Use */}
-                  {tool.status === 'In Use' ? (
-                    (() => {
+                  {(() => {
+                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                    let displayStatus = tool.status;
+
+                    if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                      displayStatus = 'Damaged';
+                    } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                      displayStatus = 'Lost';
+                    } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                      displayStatus = 'Available';
+                    }
+
+                    if (displayStatus === 'In Use') {
                       // Build assignment breakdown for this tool (ACTIVE assignments only)
                       const entries: Array<{ projectName: string; qty: number }> = [];
                       assignments.forEach(asg => {
@@ -669,7 +680,7 @@ export default function ToolsManager() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span>
-                              <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                              <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
                             </span>
                           </TooltipTrigger>
                           {hasEntries && (
@@ -685,10 +696,10 @@ export default function ToolsManager() {
                           )}
                         </Tooltip>
                       );
-                    })()
-                  ) : (
-                    <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                  )}
+                    }
+
+                    return <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>;
+                  })()}
                   {/* Show quantity based on filter or if > 1 */}
                   {(() => {
                     const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
@@ -697,10 +708,10 @@ export default function ToolsManager() {
 
                     if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
                       displayQty = extTool.damagedQuantity;
-                      prefix = "Damaged Qty";
+                      prefix = "Qty";
                     } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                       displayQty = extTool.lostQuantity;
-                      prefix = "Lost Qty";
+                      prefix = "Qty";
                     } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
                       displayQty = extTool.quantity;
                     }
@@ -773,8 +784,19 @@ export default function ToolsManager() {
                         <h3 className="font-semibold text-lg">{tool.name}</h3>
                         <div className="flex gap-2 mt-1">
                           <Badge variant="outline">{tool.category}</Badge>
-                          {tool.status === 'In Use' ? (
-                            (() => {
+                          {(() => {
+                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                            let displayStatus = tool.status;
+
+                            if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                              displayStatus = 'Damaged';
+                            } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                              displayStatus = 'Lost';
+                            } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                              displayStatus = 'Available';
+                            }
+
+                            if (displayStatus === 'In Use') {
                               // Build assignment breakdown for this tool (ACTIVE assignments only)
                               const entries: Array<{ projectName: string; qty: number }> = [];
                               assignments.forEach(asg => {
@@ -793,7 +815,7 @@ export default function ToolsManager() {
                                 <Tooltip>
                                   <TooltipTrigger asChild>
                                     <span>
-                                      <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
+                                      <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
                                     </span>
                                   </TooltipTrigger>
                                   {hasEntries && (
@@ -809,10 +831,10 @@ export default function ToolsManager() {
                                   )}
                                 </Tooltip>
                               );
-                            })()
-                          ) : (
-                            <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
-                          )}
+                            }
+
+                            return <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>;
+                          })()}
                           {/* Show quantity based on filter or if > 1 */}
                           {(() => {
                             const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
@@ -821,10 +843,10 @@ export default function ToolsManager() {
 
                             if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
                               displayQty = extTool.damagedQuantity;
-                              prefix = "Damaged Qty";
+                              prefix = "Qty";
                             } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                               displayQty = extTool.lostQuantity;
-                              prefix = "Lost Qty";
+                              prefix = "Qty";
                             } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
                               displayQty = extTool.quantity;
                             }
