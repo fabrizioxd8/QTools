@@ -118,7 +118,20 @@ export default function ToolsManager() {
   const filteredTools = tools
     .filter(tool => {
       const matchesCategory = categoryFilter === 'All' || tool.category === categoryFilter;
-      const matchesStatus = statusFilter === 'All' || tool.status === statusFilter;
+      let matchesStatus = false;
+
+      if (statusFilter === 'All') {
+        matchesStatus = true;
+      } else if (statusFilter === 'Damaged') {
+        matchesStatus = tool.status === 'Damaged' || (tool.damagedQuantity && tool.damagedQuantity > 0);
+      } else if (statusFilter === 'Lost') {
+        matchesStatus = tool.status === 'Lost' || (tool.lostQuantity && tool.lostQuantity > 0);
+      } else if (statusFilter === 'Available') {
+        matchesStatus = tool.status === 'Available' || (tool.quantity && tool.quantity > 0);
+      } else {
+        matchesStatus = tool.status === statusFilter;
+      }
+
       const matches = matchesSearch(tool.name, searchQuery);
       return matchesCategory && matchesStatus && matches;
     })
@@ -357,34 +370,80 @@ export default function ToolsManager() {
       // The standard attributes that should get their own columns (excluding 'Custom')
       const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
 
-      // Map tools to row data
-      const data = filteredTools.map(tool => {
-        const row: Record<string, string | number> = {
-          'Name': tool.name,
-          'Category': tool.category,
-          'Status': tool.status,
-          'Quantity': (tool as ExtendedTool).quantity || 1,
-          'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
-          'Calibration Due': tool.calibrationDue || '',
-          'Certificate Number': (tool as ExtendedTool).certificateNumber || '',
+      // Expand tools into rows based on quantity fields if filtering by 'All'
+      const data: Record<string, string | number>[] = [];
+      const toolsToExport = statusFilter === 'All' ? tools : filteredTools;
+
+      toolsToExport.forEach(tool => {
+        const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+
+        // Base row data
+        const getBaseRow = (status: string, qty: number): Record<string, string | number> => {
+          const row: Record<string, string | number> = {
+            'Name': tool.name,
+            'Category': tool.category,
+            'Status': status,
+            'Quantity': qty,
+            'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
+            'Calibration Due': tool.calibrationDue || '',
+            'Certificate Number': extTool.certificateNumber || '',
+          };
+
+          standardKeys.forEach(key => {
+            row[key] = tool.customAttributes[key] || '';
+          });
+
+          const extraInfo: string[] = [];
+          Object.entries(tool.customAttributes).forEach(([key, value]) => {
+            if (!standardKeys.includes(key)) {
+              extraInfo.push(`${key}: ${value}`);
+            }
+          });
+          row['EXTRA INFORMATION'] = extraInfo.join(' | ');
+          return row;
         };
 
-        // Add standard custom attributes to primary columns
-        standardKeys.forEach(key => {
-          row[key] = tool.customAttributes[key] || '';
-        });
+        // If filtering by 'All', expand rows
+        if (statusFilter === 'All') {
+          let hasExported = false;
+          // Note: In Use status is inferred from assignments, but tool.status may track this.
+          // In the database, status changes to "In Use" if a unit is checked out.
+          // For simplicity, we just use the raw tool.status if quantity > 0,
+          // or fallback to Available.
+          const mainStatus = tool.status === 'In Use' ? 'In Use' : 'Available';
 
-        // Consolidate the rest of the custom attributes into a single string
-        const extraInfo: string[] = [];
-        Object.entries(tool.customAttributes).forEach(([key, value]) => {
-          if (!standardKeys.includes(key)) {
-            extraInfo.push(`${key}: ${value}`);
+          if (extTool.quantity !== undefined && extTool.quantity > 0) {
+            data.push(getBaseRow(mainStatus, extTool.quantity));
+            hasExported = true;
           }
-        });
+          if (extTool.damagedQuantity !== undefined && extTool.damagedQuantity > 0) {
+            data.push(getBaseRow('Damaged', extTool.damagedQuantity));
+            hasExported = true;
+          }
+          if (extTool.lostQuantity !== undefined && extTool.lostQuantity > 0) {
+            data.push(getBaseRow('Lost', extTool.lostQuantity));
+            hasExported = true;
+          }
 
-        row['EXTRA INFORMATION'] = extraInfo.join(' | ');
+          // Fallback if all quantities are 0 but the tool exists
+          if (!hasExported) {
+            data.push(getBaseRow(tool.status, extTool.quantity || 1));
+          }
+        } else {
+          // If filtered, just export based on current view
+          let displayQty = extTool.quantity;
+          let displayStatus = tool.status;
 
-        return row;
+          if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+            displayQty = extTool.damagedQuantity;
+            displayStatus = 'Damaged';
+          } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+            displayQty = extTool.lostQuantity;
+            displayStatus = 'Lost';
+          }
+
+          data.push(getBaseRow(displayStatus, displayQty || 1));
+        }
       });
 
       // Create worksheet and workbook
@@ -630,13 +689,31 @@ export default function ToolsManager() {
                   ) : (
                     <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                   )}
-                  {/* Show quantity only when > 1 */}
+                  {/* Show quantity based on filter or if > 1 */}
                   {(() => {
-                    const qty = (tool as ExtendedTool).quantity;
-                    return qty !== undefined && qty !== null && qty > 1;
-                  })() && (
-                      <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                    )}
+                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                    let displayQty = extTool.quantity;
+                    let prefix = "Qty";
+
+                    if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                      displayQty = extTool.damagedQuantity;
+                      prefix = "Damaged Qty";
+                    } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                      displayQty = extTool.lostQuantity;
+                      prefix = "Lost Qty";
+                    } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                      displayQty = extTool.quantity;
+                    }
+
+                    // Always show if filtering by Damaged or Lost and there is quantity
+                    if ((statusFilter === 'Damaged' || statusFilter === 'Lost') && displayQty !== undefined && displayQty > 0) {
+                      return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
+                    }
+
+                    return displayQty !== undefined && displayQty !== null && displayQty > 1 ? (
+                      <Badge variant="outline">{prefix}: {displayQty}</Badge>
+                    ) : null;
+                  })()}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
@@ -736,13 +813,31 @@ export default function ToolsManager() {
                           ) : (
                             <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>
                           )}
-                          {/* Show quantity only when > 1 */}
+                          {/* Show quantity based on filter or if > 1 */}
                           {(() => {
-                            const qty = (tool as ExtendedTool).quantity;
-                            return qty !== undefined && qty !== null && qty > 1;
-                          })() && (
-                              <Badge variant="outline">Qty: {(tool as ExtendedTool).quantity}</Badge>
-                            )}
+                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                            let displayQty = extTool.quantity;
+                            let prefix = "Qty";
+
+                            if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                              displayQty = extTool.damagedQuantity;
+                              prefix = "Damaged Qty";
+                            } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                              displayQty = extTool.lostQuantity;
+                              prefix = "Lost Qty";
+                            } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                              displayQty = extTool.quantity;
+                            }
+
+                            // Always show if filtering by Damaged or Lost and there is quantity
+                            if ((statusFilter === 'Damaged' || statusFilter === 'Lost') && displayQty !== undefined && displayQty > 0) {
+                              return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
+                            }
+
+                            return displayQty !== undefined && displayQty !== null && displayQty > 1 ? (
+                              <Badge variant="outline">{prefix}: {displayQty}</Badge>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
 

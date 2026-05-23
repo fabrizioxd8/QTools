@@ -26,7 +26,7 @@ const upload = multer({ storage });
 router.get('/', async (req, res) => {
   try {
     const tools = await allQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
       FROM tools
       ORDER BY name
     `);
@@ -37,6 +37,8 @@ router.get('/', async (req, res) => {
       isCalibrable: Boolean(Number(tool.isCalibrable)),
       certificateNumber: tool.certificateNumber || null,
       quantity: tool.quantity !== undefined && tool.quantity !== null ? Number(tool.quantity) : undefined,
+      damagedQuantity: tool.damagedQuantity !== undefined && tool.damagedQuantity !== null ? Number(tool.damagedQuantity) : 0,
+      lostQuantity: tool.lostQuantity !== undefined && tool.lostQuantity !== null ? Number(tool.lostQuantity) : 0,
       customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
     }));
 
@@ -51,7 +53,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const tool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
       FROM tools
       WHERE id = ?
     `, [req.params.id]);
@@ -65,6 +67,8 @@ router.get('/:id', async (req, res) => {
       isCalibrable: Boolean(Number(tool.isCalibrable)),
       certificateNumber: tool.certificateNumber || null,
       quantity: tool.quantity !== undefined && tool.quantity !== null ? Number(tool.quantity) : undefined,
+      damagedQuantity: tool.damagedQuantity !== undefined && tool.damagedQuantity !== null ? Number(tool.damagedQuantity) : 0,
+      lostQuantity: tool.lostQuantity !== undefined && tool.lostQuantity !== null ? Number(tool.lostQuantity) : 0,
       customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
     };
 
@@ -100,7 +104,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     ]);
 
     const newTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
       FROM tools
       WHERE id = ?
     `, [result.id]);
@@ -110,6 +114,8 @@ router.post('/', upload.single('image'), async (req, res) => {
       isCalibrable: Boolean(Number(newTool.isCalibrable)),
       certificateNumber: newTool.certificateNumber || null,
       quantity: newTool.quantity !== undefined && newTool.quantity !== null ? Number(newTool.quantity) : undefined,
+      damagedQuantity: newTool.damagedQuantity !== undefined && newTool.damagedQuantity !== null ? Number(newTool.damagedQuantity) : 0,
+      lostQuantity: newTool.lostQuantity !== undefined && newTool.lostQuantity !== null ? Number(newTool.lostQuantity) : 0,
       customAttributes: newTool.customAttributes ? JSON.parse(newTool.customAttributes) : {}
     };
 
@@ -179,7 +185,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     `, updateValues);
 
     const updatedTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
       FROM tools
       WHERE id = ?
     `, [req.params.id]);
@@ -193,6 +199,8 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       isCalibrable: Boolean(Number(updatedTool.isCalibrable)),
       certificateNumber: updatedTool.certificateNumber || null,
       quantity: updatedTool.quantity !== undefined && updatedTool.quantity !== null ? Number(updatedTool.quantity) : undefined,
+      damagedQuantity: updatedTool.damagedQuantity !== undefined && updatedTool.damagedQuantity !== null ? Number(updatedTool.damagedQuantity) : 0,
+      lostQuantity: updatedTool.lostQuantity !== undefined && updatedTool.lostQuantity !== null ? Number(updatedTool.lostQuantity) : 0,
       customAttributes: updatedTool.customAttributes ? JSON.parse(updatedTool.customAttributes) : {}
     };
 

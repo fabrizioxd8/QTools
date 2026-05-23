@@ -56,14 +56,17 @@ export default function Reports() {
   const today = useMemo(() => new Date(), []);
   const startDate = useMemo(() => {
     const parsed = new Date(startDateStr);
-    return Number.isNaN(parsed.getTime()) ? new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000) : parsed;
+    if (Number.isNaN(parsed.getTime())) return new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000);
+    // When parsing YYYY-MM-DD, it parses as UTC midnight.
+    // We want the start of that day in UTC, so we can just use the parsed date as is for start,
+    // or to be safe and match local time checkouts, we treat it as local.
+    // The simplest robust way is to append T00:00:00
+    return new Date(`${startDateStr}T00:00:00`);
   }, [startDateStr, today]);
   const endDate = useMemo(() => {
     const parsed = new Date(endDateStr);
     if (Number.isNaN(parsed.getTime())) return today;
-    const copy = new Date(parsed);
-    copy.setHours(23, 59, 59, 999);
-    return copy;
+    return new Date(`${endDateStr}T23:59:59.999`);
   }, [endDateStr, today]);
 
   const handlePresetChange = (value: '7' | '30' | '90' | 'custom') => {
