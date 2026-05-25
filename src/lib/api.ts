@@ -209,7 +209,7 @@ class ApiClient {
   async checkinAssignment(id: number, data: {
     checkinDate?: string;
     checkinNotes?: string;
-    toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>;
+    toolConditions?: Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>>;
   }): Promise<Assignment> {
     return this.request<Assignment>(`/assignments/${id}/checkin`, {
       method: 'PUT',

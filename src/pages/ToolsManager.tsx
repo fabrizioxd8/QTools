@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools', 'Cleaning and Maintenance', 'Workstation Equipment'];
-const statuses: Tool['status'][] = ['Available', 'In Use', 'Damaged', 'Lost', 'Cal. Due'];
+const statuses: (Tool['status'] | 'Missing')[] = ['Available', 'In Use', 'Damaged', 'Lost', 'Missing', 'Cal. Due'];
 
 const standardAttributes = ['Brand', 'Model', 'Serial Number', 'Location', 'Purchase Date', 'Custom'];
 
@@ -113,7 +113,15 @@ export default function ToolsManager() {
       setSearchQuery(storedSearch);
       window.localStorage.removeItem('toolSearchTerm');
     }
+    const storedStatusFilter = window.localStorage.getItem('toolStatusFilter');
+    if (storedStatusFilter) {
+      setStatusFilter(storedStatusFilter);
+      window.localStorage.removeItem('toolStatusFilter');
+    }
   }, []);
+
+  // Dynamic read-only logic based on filtered status
+  const isReadOnly = statusFilter !== 'All' && statusFilter !== 'Available';
 
   const filteredTools = tools
     .filter(tool => {
@@ -123,11 +131,44 @@ export default function ToolsManager() {
       if (statusFilter === 'All') {
         matchesStatus = true;
       } else if (statusFilter === 'Damaged') {
-        matchesStatus = tool.status === 'Damaged' || (tool.damagedQuantity && tool.damagedQuantity > 0);
+        // Match global status OR specific damaged quantity OR items marked damaged in check-ins
+        const hasDamagedInAsg = assignments.some(asg => {
+          const cond = asg.toolConditions?.[tool.id];
+          return cond && (typeof cond === 'object' ? Number((cond as any).damaged) > 0 : cond === 'damaged');
+        });
+        matchesStatus = tool.status === 'Damaged' || ((tool as any).damagedQuantity > 0) || hasDamagedInAsg;
       } else if (statusFilter === 'Lost') {
-        matchesStatus = tool.status === 'Lost' || (tool.lostQuantity && tool.lostQuantity > 0);
+        const hasLostInAsg = assignments.some(asg => {
+          const cond = asg.toolConditions?.[tool.id];
+          return cond && (typeof cond === 'object' ? Number((cond as any).lost) > 0 : cond === 'lost');
+        });
+        matchesStatus = tool.status === 'Lost' || ((tool as any).lostQuantity > 0) || hasLostInAsg;
       } else if (statusFilter === 'Available') {
-        matchesStatus = tool.status === 'Available' || (tool.quantity && tool.quantity > 0);
+        matchesStatus = tool.status === 'Available' || ((tool as any).availableQuantity > 0);
+      } else if (statusFilter === 'Missing') {
+        // Match tools that have missing qty in any completed assignment
+        matchesStatus = assignments.some(asg => {
+          if (asg.status !== 'completed' || !asg.toolConditions) return false;
+          const cond = asg.toolConditions[tool.id];
+          if (!cond) return false;
+          if (typeof cond === 'object') return Number((cond as any).missing) > 0;
+          return cond === 'missing';
+        });
+      } else if (statusFilter === 'Cal. Due') {
+        // Match tools with status 'Cal. Due' OR calibrable tools with overdue/soon calibration
+        if (tool.status === 'Cal. Due') {
+          matchesStatus = true;
+        } else if (tool.isCalibrable && tool.calibrationDue) {
+          const dueDate = new Date(tool.calibrationDue);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          dueDate.setHours(0, 0, 0, 0);
+          const thirtyDaysFromNow = new Date(today);
+          thirtyDaysFromNow.setDate(today.getDate() + 30);
+          matchesStatus = dueDate <= thirtyDaysFromNow;
+        }
+      } else if (statusFilter === 'In Use') {
+        matchesStatus = tool.status === 'In Use' || ((tool as any).inUseQuantity > 0);
       } else {
         matchesStatus = tool.status === statusFilter;
       }
@@ -152,7 +193,16 @@ export default function ToolsManager() {
   const openDialog = (tool?: Tool) => {
     if (tool) {
       setEditingTool(tool);
-      const t = tool as Tool & Partial<{ certificateNumber: string; quantity: number }>;
+      const t = tool as Tool & Partial<{ certificateNumber: string; quantity: number; inUseQuantity: number; damagedQuantity: number; lostQuantity: number; missingQuantity: number }>;
+
+      let displayQty = t.quantity || 1;
+      if (isReadOnly) {
+        if (statusFilter === 'In Use') displayQty = t.inUseQuantity || 0;
+        else if (statusFilter === 'Damaged') displayQty = t.damagedQuantity || 0;
+        else if (statusFilter === 'Lost') displayQty = t.lostQuantity || 0;
+        else if (statusFilter === 'Missing') displayQty = t.missingQuantity || 0;
+      }
+
       setFormData({
         name: tool.name,
         category: tool.category,
@@ -160,7 +210,7 @@ export default function ToolsManager() {
         isCalibrable: tool.isCalibrable,
         calibrationDue: tool.calibrationDue || '',
         certificateNumber: t.certificateNumber || '',
-        quantity: t.quantity || 1,
+        quantity: displayQty,
         image: tool.image || null,
         customAttributes: { ...tool.customAttributes },
       });
@@ -365,6 +415,66 @@ export default function ToolsManager() {
     }
   };
 
+  // Build tooltip entries for a tool showing "In Use":
+  // - Active assignments contribute real project + qty
+  // - Completed assignments with missing qty contribute "Missing (Project)" entries
+  const buildInUseEntries = (toolId: number): Array<{ projectName: string; qty: number; missing?: boolean }> => {
+    const entries: Array<{ projectName: string; qty: number; missing?: boolean }> = [];
+    assignments.forEach(asg => {
+      if (asg.status === 'active') {
+        asg.tools.forEach(t => {
+          if (t.id === toolId && (t.quantity || 1) > 0) {
+            entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+          }
+        });
+      }
+      if (asg.status === 'completed' && asg.toolConditions) {
+        const cond = asg.toolConditions[toolId];
+        if (cond && typeof cond === 'object') {
+          const missingQty = Number((cond as any).missing) || 0;
+          if (missingQty > 0) {
+            entries.push({ projectName: asg.project.name, qty: missingQty, missing: true });
+          }
+        } else if (cond === 'missing') {
+          const toolInAsg = asg.tools.find(t => t.id === toolId);
+          if (toolInAsg) entries.push({ projectName: asg.project.name, qty: toolInAsg.quantity || 1, missing: true });
+        }
+      }
+    });
+    return entries;
+  };
+
+  const renderInUseBadge = (toolId: number) => {
+    const entries = buildInUseEntries(toolId);
+    const hasEntries = entries.length > 0;
+
+    return (
+      <Tooltip key={`in-use-${toolId}`}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">
+            <Badge variant={getStatusBadgeVariant('In Use')}>In Use</Badge>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {hasEntries ? (
+            <div className="space-y-1">
+              {entries.map((e, i) => (
+                <div key={i} className="text-sm">
+                  {e.missing
+                    ? <><span className="text-yellow-400 font-semibold">Missing</span> — last seen: <strong>{e.projectName}</strong> ({e.qty})</>
+                    : <><strong>{e.projectName}</strong>: {e.qty}</>
+                  }
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No active assignment data</p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const handleExportExcel = () => {
     try {
       // The standard attributes that should get their own columns (excluding 'Custom')
@@ -372,18 +482,61 @@ export default function ToolsManager() {
 
       // Expand tools into rows based on quantity fields if filtering by 'All'
       const data: Record<string, string | number>[] = [];
-      const toolsToExport = statusFilter === 'All' ? tools : filteredTools;
+      // Always use filteredTools so category/search filters are respected
+      const toolsToExport = filteredTools;
 
       toolsToExport.forEach(tool => {
         const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
 
+        // Calculate real-time In Use quantity and project list from active assignments
+        const inUseEntries: Array<{ projectName: string; qty: number }> = [];
+        const damagedEntries: Array<{ projectName: string; qty: number }> = [];
+        const lostEntries: Array<{ projectName: string; qty: number }> = [];
+        const missingEntries: Array<{ projectName: string; qty: number }> = [];
+
+        assignments.forEach(asg => {
+          if (asg.status === 'active') {
+            asg.tools.forEach(t => {
+              if (t.id === tool.id) {
+                inUseEntries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+              }
+            });
+          }
+          if (asg.status === 'completed' && asg.toolConditions) {
+            const cond = asg.toolConditions[tool.id];
+            if (cond && typeof cond === 'object') {
+              const dmg = Number((cond as any).damaged) || 0;
+              const lost = Number((cond as any).lost) || 0;
+              const missing = Number((cond as any).missing) || 0;
+              if (dmg > 0) damagedEntries.push({ projectName: asg.project.name, qty: dmg });
+              if (lost > 0) lostEntries.push({ projectName: asg.project.name, qty: lost });
+              if (missing > 0) missingEntries.push({ projectName: asg.project.name, qty: missing });
+            } else if (typeof cond === 'string') {
+              const qty = asg.tools.find(t => t.id === tool.id)?.quantity || 1;
+              if (cond === 'damaged') damagedEntries.push({ projectName: asg.project.name, qty });
+              if (cond === 'lost') lostEntries.push({ projectName: asg.project.name, qty });
+              if (cond === 'missing') missingEntries.push({ projectName: asg.project.name, qty });
+            }
+          }
+        });
+
+        const inUseTotal = inUseEntries.reduce((sum, e) => sum + e.qty, 0);
+        const damagedTotal = damagedEntries.reduce((sum, e) => sum + e.qty, 0);
+        const lostTotal = lostEntries.reduce((sum, e) => sum + e.qty, 0);
+        const missingTotal = missingEntries.reduce((sum, e) => sum + e.qty, 0);
+        const assignedProjectList = Array.from(new Set(inUseEntries.map(e => e.projectName))).join(', ');
+        const damagedProjectList = Array.from(new Set(damagedEntries.map(e => e.projectName))).join(', ');
+        const lostProjectList = Array.from(new Set(lostEntries.map(e => e.projectName))).join(', ');
+        const missingProjectList = Array.from(new Set(missingEntries.map(e => e.projectName))).join(', ');
+
         // Base row data
-        const getBaseRow = (status: string, qty: number): Record<string, string | number> => {
+        const getBaseRow = (status: string, qty: number, projects: string = ''): Record<string, string | number> => {
           const row: Record<string, string | number> = {
             'Name': tool.name,
             'Category': tool.category,
             'Status': status,
             'Quantity': qty,
+            'Project Assigned': projects,
             'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
             'Calibration Due': tool.calibrationDue || '',
             'Certificate Number': extTool.certificateNumber || '',
@@ -406,43 +559,75 @@ export default function ToolsManager() {
         // If filtering by 'All', expand rows
         if (statusFilter === 'All') {
           let hasExported = false;
-          // Note: In Use status is inferred from assignments, but tool.status may track this.
-          // In the database, status changes to "In Use" if a unit is checked out.
-          // For simplicity, we just use the raw tool.status if quantity > 0,
-          // or fallback to Available.
-          const mainStatus = tool.status === 'In Use' ? 'In Use' : 'Available';
 
           if (extTool.quantity !== undefined && extTool.quantity > 0) {
-            data.push(getBaseRow(mainStatus, extTool.quantity));
+            // If the tool is globally marked as Lost or Damaged, use that status instead of "Available"
+            const displayStatus = (tool.status === 'Lost' || tool.status === 'Damaged' || tool.status === 'Cal. Due') ? tool.status : 'Available';
+            data.push(getBaseRow(displayStatus, extTool.quantity));
             hasExported = true;
           }
-          if (extTool.damagedQuantity !== undefined && extTool.damagedQuantity > 0) {
-            data.push(getBaseRow('Damaged', extTool.damagedQuantity));
+          if (inUseTotal > 0) {
+            data.push(getBaseRow('In Use', inUseTotal, assignedProjectList));
             hasExported = true;
           }
-          if (extTool.lostQuantity !== undefined && extTool.lostQuantity > 0) {
-            data.push(getBaseRow('Lost', extTool.lostQuantity));
+          // Use assignment-derived totals as source of truth (DB fields may lag)
+          const damagedQty = damagedTotal > 0 ? damagedTotal : (extTool.damagedQuantity || 0);
+          const lostQty = lostTotal > 0 ? lostTotal : (extTool.lostQuantity || 0);
+          if (damagedQty > 0 && tool.status !== 'Damaged') {
+            data.push(getBaseRow('Damaged', damagedQty, damagedProjectList));
+            hasExported = true;
+          }
+          if (lostQty > 0 && tool.status !== 'Lost') {
+            data.push(getBaseRow('Lost', lostQty, lostProjectList));
+            hasExported = true;
+          }
+          if (missingTotal > 0) {
+            data.push(getBaseRow('Missing', missingTotal, missingProjectList));
+            hasExported = true;
+          }
+          // Cal. Due: only emit a row if this tool is in the Cal. Due filter set.
+          // Pre-check using the same logic as filteredTools to avoid false positives.
+          const isCalDue = (() => {
+            if (!tool.isCalibrable || !tool.calibrationDue) return false;
+            if (tool.status === 'Cal. Due') return true;
+            const dueDate = new Date(`${tool.calibrationDue}T00:00:00`);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const thirtyDaysFromNow = new Date(today);
+            thirtyDaysFromNow.setDate(today.getDate() + 30);
+            return dueDate <= thirtyDaysFromNow;
+          })();
+          if (isCalDue) {
+            const calQty = (extTool.quantity || 0) + inUseTotal;
+            data.push(getBaseRow('Cal. Due', calQty > 0 ? calQty : 1));
             hasExported = true;
           }
 
           // Fallback if all quantities are 0 but the tool exists
           if (!hasExported) {
-            data.push(getBaseRow(tool.status, extTool.quantity || 1));
+            data.push(getBaseRow(tool.status, extTool.quantity || 0));
           }
         } else {
           // If filtered, just export based on current view
           let displayQty = extTool.quantity;
           let displayStatus = tool.status;
 
-          if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
-            displayQty = extTool.damagedQuantity;
-            displayStatus = 'Damaged';
-          } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
-            displayQty = extTool.lostQuantity;
-            displayStatus = 'Lost';
+          if (statusFilter === 'Damaged' && (damagedTotal > 0 || (extTool.damagedQuantity && extTool.damagedQuantity > 0))) {
+            const damagedQty = damagedTotal > 0 ? damagedTotal : (extTool.damagedQuantity || 0);
+            data.push(getBaseRow('Damaged', damagedQty, damagedProjectList));
+          } else if (statusFilter === 'Lost' && (lostTotal > 0 || (extTool.lostQuantity && extTool.lostQuantity > 0))) {
+            const lostQty = lostTotal > 0 ? lostTotal : (extTool.lostQuantity || 0);
+            data.push(getBaseRow('Lost', lostQty, lostProjectList));
+          } else if (statusFilter === 'In Use' && missingTotal > 0 && inUseTotal === 0) {
+            data.push(getBaseRow('Missing', missingTotal, missingProjectList));
+          } else if (statusFilter === 'Missing') {
+            data.push(getBaseRow('Missing', missingTotal, missingProjectList));
+          } else if (statusFilter === 'Cal. Due') {
+            const calQty = (extTool.quantity || 0) + inUseTotal;
+            data.push(getBaseRow('Cal. Due', calQty > 0 ? calQty : 1));
+          } else {
+            data.push(getBaseRow(displayStatus, displayQty || 1));
           }
-
-          data.push(getBaseRow(displayStatus, displayQty || 1));
         }
       });
 
@@ -451,8 +636,69 @@ export default function ToolsManager() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory');
 
-      // Generate Excel file buffer
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      // --- Formatted table ---
+      const numRows = data.length;
+      const numCols = data.length > 0 ? Object.keys(data[0]).length : 0;
+
+      if (numRows > 0 && numCols > 0) {
+        const colLetter = (n: number) => {
+          let s = '';
+          let col = n;
+          while (col >= 0) {
+            s = String.fromCharCode((col % 26) + 65) + s;
+            col = Math.floor(col / 26) - 1;
+          }
+          return s;
+        };
+
+        const lastCol = colLetter(numCols - 1);
+
+        // Autofilter — gives native Excel column filter dropdowns on every header
+        worksheet['!autofilter'] = { ref: `A1:${lastCol}1` };
+
+        // Freeze the header row so it stays visible while scrolling
+        worksheet['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+        // Auto-fit column widths based on content
+        const colWidths = Object.keys(data[0]).map(header => {
+          const maxLen = data.reduce((max, row) => {
+            const val = row[header];
+            return Math.max(max, val !== undefined && val !== null ? String(val).length : 0);
+          }, header.length);
+          return { wch: Math.min(maxLen + 2, 50) };
+        });
+        worksheet['!cols'] = colWidths;
+
+        // Style header row: bold + teal background
+        const headers = Object.keys(data[0]);
+        headers.forEach((_, colIdx) => {
+          const cellAddr = `${colLetter(colIdx)}1`;
+          if (!worksheet[cellAddr]) return;
+          worksheet[cellAddr].s = {
+            font: { bold: true, color: { rgb: 'FFFFFF' } },
+            fill: { fgColor: { rgb: '0F766E' }, patternType: 'solid' },
+            alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
+            border: { bottom: { style: 'thin', color: { rgb: 'CCCCCC' } } },
+          };
+        });
+
+        // Banded row fill for data rows (alternating white / light teal)
+        for (let rowIdx = 2; rowIdx <= numRows + 1; rowIdx++) {
+          const fillColor = rowIdx % 2 === 0 ? 'E6F4F3' : 'FFFFFF';
+          for (let colIdx = 0; colIdx < numCols; colIdx++) {
+            const cellAddr = `${colLetter(colIdx)}${rowIdx}`;
+            if (!worksheet[cellAddr]) continue;
+            worksheet[cellAddr].s = {
+              fill: { fgColor: { rgb: fillColor }, patternType: 'solid' },
+              alignment: { vertical: 'center' },
+              border: { bottom: { style: 'hair', color: { rgb: 'DDDDDD' } } },
+            };
+          }
+        }
+      }
+
+      // Generate Excel file buffer — use xlsx full write for style support
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
       const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
 
       // Save file
@@ -493,7 +739,7 @@ export default function ToolsManager() {
             <Download className="mr-2 h-4 w-4" />
             Export to Excel
           </Button>
-          <Button onClick={() => openDialog()}>
+          <Button onClick={() => openDialog()} disabled={isReadOnly}>
             <Plus className="mr-2 h-4 w-4" />
             Add New Tool
           </Button>
@@ -650,59 +896,43 @@ export default function ToolsManager() {
                   <Badge variant="outline">{tool.category}</Badge>
                   {/* Status badge with optional tooltip when In Use */}
                   {(() => {
-                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
+
+                    if (statusFilter === 'All') {
+                      const showInUse = (extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0;
+                      return (
+                        <>
+                          {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>}
+                          {(showInUse || tool.status === 'In Use') && renderInUseBadge(tool.id)}
+                        </>
+                      );
+                    }
+
                     let displayStatus = tool.status;
 
                     if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
                       displayStatus = 'Damaged';
                     } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                       displayStatus = 'Lost';
-                    } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                    } else if (statusFilter === 'Available' && extTool.availableQuantity && extTool.availableQuantity > 0) {
                       displayStatus = 'Available';
+                    } else if (statusFilter === 'Missing') {
+                      displayStatus = 'In Use';
+                    } else if (statusFilter === 'In Use') {
+                      displayStatus = 'In Use';
+                    } else if (statusFilter === 'Cal. Due') {
+                      displayStatus = 'Cal. Due';
                     }
 
                     if (displayStatus === 'In Use') {
-                      // Build assignment breakdown for this tool (ACTIVE assignments only)
-                      const entries: Array<{ projectName: string; qty: number }> = [];
-                      assignments.forEach(asg => {
-                        if (asg.status === 'active') {
-                          asg.tools.forEach(t => {
-                            if (t.id === tool.id && (t.quantity || 1) > 0) {
-                              entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-                            }
-                          });
-                        }
-                      });
-
-                      const hasEntries = entries.length > 0;
-
-                      return (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
-                            </span>
-                          </TooltipTrigger>
-                          {hasEntries && (
-                            <TooltipContent>
-                              <div className="space-y-1">
-                                {entries.map((e, i) => (
-                                  <div key={i} className="text-sm">
-                                    <strong>{e.projectName}</strong>: {e.qty}
-                                  </div>
-                                ))}
-                              </div>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      );
+                      return renderInUseBadge(tool.id);
                     }
 
                     return <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>;
                   })()}
                   {/* Show quantity based on filter or if > 1 */}
                   {(() => {
-                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
                     let displayQty = extTool.quantity;
                     let prefix = "Qty";
 
@@ -712,12 +942,21 @@ export default function ToolsManager() {
                     } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                       displayQty = extTool.lostQuantity;
                       prefix = "Qty";
-                    } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
-                      displayQty = extTool.quantity;
+                    } else if (statusFilter === 'In Use') {
+                      displayQty = extTool.inUseQuantity || 0;
+                      prefix = "Qty";
+                    } else if (statusFilter === 'Available') {
+                      displayQty = extTool.availableQuantity || 0;
+                      prefix = "Qty";
+                    } else if (statusFilter === 'Missing') {
+                      displayQty = extTool.missingQuantity || 0;
+                      prefix = "Qty";
+                    } else if (statusFilter === 'All') {
+                      prefix = "Total";
                     }
 
-                    // Always show if filtering by Damaged or Lost and there is quantity
-                    if ((statusFilter === 'Damaged' || statusFilter === 'Lost') && displayQty !== undefined && displayQty > 0) {
+                    // Always show if filtering by Damaged, Lost, In Use, Missing, or Available and there is quantity
+                    if ((statusFilter === 'Damaged' || statusFilter === 'Lost' || statusFilter === 'Missing' || statusFilter === 'In Use' || statusFilter === 'Available') && displayQty !== undefined && displayQty > 0) {
                       return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
                     }
 
@@ -785,59 +1024,43 @@ export default function ToolsManager() {
                         <div className="flex gap-2 mt-1">
                           <Badge variant="outline">{tool.category}</Badge>
                           {(() => {
-                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
+
+                            if (statusFilter === 'All') {
+                              const showInUse = (extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0;
+                              return (
+                                <>
+                                  {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>}
+                                  {(showInUse || tool.status === 'In Use') && renderInUseBadge(tool.id)}
+                                </>
+                              );
+                            }
+
                             let displayStatus = tool.status;
 
                             if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
                               displayStatus = 'Damaged';
                             } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                               displayStatus = 'Lost';
-                            } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
+                            } else if (statusFilter === 'Available' && extTool.availableQuantity && extTool.availableQuantity > 0) {
                               displayStatus = 'Available';
+                            } else if (statusFilter === 'Missing') {
+                              displayStatus = 'In Use';
+                            } else if (statusFilter === 'In Use') {
+                              displayStatus = 'In Use';
+                            } else if (statusFilter === 'Cal. Due') {
+                              displayStatus = 'Cal. Due';
                             }
 
                             if (displayStatus === 'In Use') {
-                              // Build assignment breakdown for this tool (ACTIVE assignments only)
-                              const entries: Array<{ projectName: string; qty: number }> = [];
-                              assignments.forEach(asg => {
-                                if (asg.status === 'active') {
-                                  asg.tools.forEach(t => {
-                                    if (t.id === tool.id && (t.quantity || 1) > 0) {
-                                      entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-                                    }
-                                  });
-                                }
-                              });
-
-                              const hasEntries = entries.length > 0;
-
-                              return (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>
-                                      <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>
-                                    </span>
-                                  </TooltipTrigger>
-                                  {hasEntries && (
-                                    <TooltipContent>
-                                      <div className="space-y-1">
-                                        {entries.map((e, i) => (
-                                          <div key={i} className="text-sm">
-                                            <strong>{e.projectName}</strong>: {e.qty}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              );
+                              return renderInUseBadge(tool.id);
                             }
 
                             return <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>;
                           })()}
                           {/* Show quantity based on filter or if > 1 */}
                           {(() => {
-                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
                             let displayQty = extTool.quantity;
                             let prefix = "Qty";
 
@@ -847,12 +1070,21 @@ export default function ToolsManager() {
                             } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                               displayQty = extTool.lostQuantity;
                               prefix = "Qty";
-                            } else if (statusFilter === 'Available' && extTool.quantity && extTool.quantity > 0) {
-                              displayQty = extTool.quantity;
+                            } else if (statusFilter === 'In Use') {
+                              displayQty = extTool.inUseQuantity || 0;
+                              prefix = "Qty";
+                            } else if (statusFilter === 'Available') {
+                              displayQty = extTool.availableQuantity || 0;
+                              prefix = "Qty";
+                            } else if (statusFilter === 'Missing') {
+                              displayQty = extTool.missingQuantity || 0;
+                              prefix = "Qty";
+                            } else if (statusFilter === 'All') {
+                              prefix = "Total";
                             }
 
-                            // Always show if filtering by Damaged or Lost and there is quantity
-                            if ((statusFilter === 'Damaged' || statusFilter === 'Lost') && displayQty !== undefined && displayQty > 0) {
+                            // Always show if filtering by Damaged, Lost, In Use, Missing, or Available and there is quantity
+                            if ((statusFilter === 'Damaged' || statusFilter === 'Lost' || statusFilter === 'Missing' || statusFilter === 'In Use' || statusFilter === 'Available') && displayQty !== undefined && displayQty > 0) {
                               return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
                             }
 
@@ -925,13 +1157,14 @@ export default function ToolsManager() {
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="e.g., Digital Multimeter"
+                      disabled={isReadOnly}
                       className="h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold">Category *</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                    <Select disabled={isReadOnly} value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -947,7 +1180,7 @@ export default function ToolsManager() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold">Status</Label>
-                    <Select value={formData.status} onValueChange={(value: Tool['status']) => setFormData({ ...formData, status: value })}>
+                    <Select disabled={isReadOnly} value={formData.status} onValueChange={(value: Tool['status']) => setFormData({ ...formData, status: value })}>
                       <SelectTrigger className="h-11">
                         <SelectValue />
                       </SelectTrigger>
@@ -966,6 +1199,7 @@ export default function ToolsManager() {
                       min={1}
                       value={formData.quantity}
                       onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) || 1 })}
+                      disabled={isReadOnly}
                       className="h-11 w-full max-w-xs"
                     />
                     <p className="text-xs text-muted-foreground">
@@ -982,6 +1216,7 @@ export default function ToolsManager() {
                         type="date"
                         value={formData.calibrationDue}
                         onChange={(e) => setFormData({ ...formData, calibrationDue: e.target.value })}
+                        disabled={isReadOnly}
                         className="h-11"
                       />
                     </div>
@@ -990,6 +1225,7 @@ export default function ToolsManager() {
                       <Input
                         value={formData.certificateNumber}
                         onChange={(e) => setFormData({ ...formData, certificateNumber: e.target.value })}
+                        disabled={isReadOnly}
                         placeholder="Certificate number"
                         className="h-11"
                       />
@@ -1004,6 +1240,7 @@ export default function ToolsManager() {
                   <Checkbox
                     id="calibrable"
                     checked={formData.isCalibrable}
+                    disabled={isReadOnly}
                     onCheckedChange={(checked) => setFormData({ ...formData, isCalibrable: checked as boolean })}
                     className="h-5 w-5"
                   />
@@ -1030,69 +1267,75 @@ export default function ToolsManager() {
                     <div
                       key={key}
                       className="flex gap-3 items-center p-3 bg-muted/30 rounded-lg cursor-move hover:bg-muted/40 transition-colors"
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, index)}
+                      draggable={!isReadOnly}
+                      onDragStart={(e) => !isReadOnly && handleDragStart(e, index)}
+                      onDragOver={(e) => !isReadOnly && handleDragOver(e)}
+                      onDrop={(e) => !isReadOnly && handleDrop(e, index)}
                     >
-                      <div className="cursor-grab active:cursor-grabbing">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      </div>
+                      {!isReadOnly && (
+                        <div className="cursor-grab active:cursor-grabbing">
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
                       <div className="flex-1 grid grid-cols-2 gap-3">
                         <Input value={key} disabled className="font-medium bg-background" />
                         <Input value={value} disabled className="bg-background" />
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeCustomAttribute(key)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!isReadOnly && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeCustomAttribute(key)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ))}
 
-                  <div className="flex flex-col gap-3 p-3 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-                    <div className="flex gap-3">
-                      <Select value={newAttrKeyType} onValueChange={(value) => setNewAttrKeyType(value)}>
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Attribute type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {standardAttributes.map(attr => (
-                            <SelectItem key={attr} value={attr}>{attr}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {newAttrKeyType === 'Custom' && (
+                  {!isReadOnly && (
+                    <div className="flex flex-col gap-3 p-3 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                      <div className="flex gap-3">
+                        <Select value={newAttrKeyType} onValueChange={(value) => setNewAttrKeyType(value)}>
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Attribute type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {standardAttributes.map(attr => (
+                              <SelectItem key={attr} value={attr}>{attr}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {newAttrKeyType === 'Custom' && (
+                          <Input
+                            placeholder="Custom Name"
+                            value={newAttrKey}
+                            onChange={(e) => setNewAttrKey(e.target.value)}
+                            className="flex-1"
+                          />
+                        )}
+                      </div>
+                      <div className="flex gap-3">
                         <Input
-                          placeholder="Custom Name"
-                          value={newAttrKey}
-                          onChange={(e) => setNewAttrKey(e.target.value)}
+                          placeholder="Value (e.g., Fluke)"
+                          value={newAttrValue}
+                          onChange={(e) => setNewAttrValue(e.target.value)}
                           className="flex-1"
                         />
-                      )}
+                        <Button
+                          type="button"
+                          onClick={addCustomAttribute}
+                          disabled={!(newAttrKeyType === 'Custom' ? newAttrKey : newAttrKeyType) || !newAttrValue}
+                          size="sm"
+                          className="px-3"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-3">
-                      <Input
-                        placeholder="Value (e.g., Fluke)"
-                        value={newAttrValue}
-                        onChange={(e) => setNewAttrValue(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        onClick={addCustomAttribute}
-                        disabled={!(newAttrKeyType === 'Custom' ? newAttrKey : newAttrKeyType) || !newAttrValue}
-                        size="sm"
-                        className="px-3"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1105,7 +1348,7 @@ export default function ToolsManager() {
                   Add a photo to help identify this tool
                 </p>
               </div>
-              <div className="sticky top-4">
+              <div className={`sticky top-4 ${isReadOnly ? 'pointer-events-none opacity-60' : ''}`}>
                 <ImageUploadBox
                   value={formData.image}
                   onChange={(value) => setFormData({ ...formData, image: value })}
@@ -1115,12 +1358,20 @@ export default function ToolsManager() {
             </div>
           </div>
           <DialogFooter className="pt-6 border-t">
-            <Button variant="outline" onClick={closeDialog} className="px-6">
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} className="px-6">
-              {editingTool ? 'Update Tool' : 'Add Tool'}
-            </Button>
+            {isReadOnly ? (
+              <Button variant="outline" onClick={closeDialog} className="px-6">
+                Close
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={closeDialog} className="px-6">
+                  Cancel
+                </Button>
+                <Button onClick={handleSubmit} className="px-6">
+                  {editingTool ? 'Update Tool' : 'Add Tool'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

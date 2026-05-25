@@ -129,6 +129,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               className="focus-visible:ring-ring focus-visible:outline-none"
                               onClick={() => {
                                 window.localStorage.setItem('toolSearchTerm', tool.name);
+                                window.localStorage.setItem('toolStatusFilter', 'Cal. Due');
                                 onNavigate('tools');
                               }}
                             >

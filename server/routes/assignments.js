@@ -263,50 +263,51 @@ router.put('/:id/checkin', async (req, res) => {
       // Update tool statuses based on conditions
       // Restore quantities for tools assigned to this assignment
       for (const toolRecord of toolsInAssignment) {
-        const { toolId, checkoutQuantity, currentToolQuantity } = toolRecord;
-        const condition = toolConditions ? toolConditions[toolId] : 'good';
+        const { toolId, checkoutQuantity } = toolRecord;
+        const condition = toolConditions ? toolConditions[toolId] : null;
         const restoreAmount = checkoutQuantity || 0;
-        
+
+        // Helper: expand a condition value (string or object map) into
+        // { good, damaged, lost, missing } quantities that sum to restoreAmount.
+        const expandCondition = (cond, total) => {
+          if (!cond) return { good: total, damaged: 0, lost: 0, missing: 0 };
+          if (typeof cond === 'string') {
+            return {
+              good:    cond === 'good'    ? total : 0,
+              damaged: cond === 'damaged' ? total : 0,
+              lost:    cond === 'lost'    ? total : 0,
+              missing: cond === 'missing' ? total : 0,
+            };
+          }
+          // New object format — coerce all values to numbers
+          return {
+            good:    Number(cond.good)    || 0,
+            damaged: Number(cond.damaged) || 0,
+            lost:    Number(cond.lost)    || 0,
+            missing: Number(cond.missing) || 0,
+          };
+        };
+
         if (isAlreadyCompleted) {
-          const oldCondition = oldToolConditions[toolId] || 'good';
-          if (oldCondition !== condition) {
-            // Revert old condition
-            if (oldCondition === 'good') {
-              await runQuery(`UPDATE tools SET quantity = quantity - ? WHERE id = ?`, [restoreAmount, toolId]);
-            } else if (oldCondition === 'damaged') {
-              await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity - ? WHERE id = ?`, [restoreAmount, toolId]);
-            } else if (oldCondition === 'lost') {
-              await runQuery(`UPDATE tools SET lostQuantity = lostQuantity - ? WHERE id = ?`, [restoreAmount, toolId]);
-            }
-            
-            // Apply new condition
-            if (condition === 'good') {
-              await runQuery(`UPDATE tools SET quantity = quantity + ? WHERE id = ?`, [restoreAmount, toolId]);
-            } else if (condition === 'damaged') {
-              await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`, [restoreAmount, toolId]);
-            } else if (condition === 'lost') {
-              await runQuery(`UPDATE tools SET lostQuantity = lostQuantity + ? WHERE id = ?`, [restoreAmount, toolId]);
-            }
-          }
+          const oldCond = expandCondition(oldToolConditions[toolId], restoreAmount);
+          const newCond = expandCondition(condition, restoreAmount);
+
+          // Revert old quantities
+          if (oldCond.good    > 0) await runQuery(`UPDATE tools SET quantity        = quantity        - ? WHERE id = ?`, [oldCond.good,    toolId]);
+          if (oldCond.damaged > 0) await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity - ? WHERE id = ?`, [oldCond.damaged, toolId]);
+          if (oldCond.lost    > 0) await runQuery(`UPDATE tools SET lostQuantity    = lostQuantity    - ? WHERE id = ?`, [oldCond.lost,    toolId]);
+
+          // Apply new quantities
+          if (newCond.good    > 0) await runQuery(`UPDATE tools SET quantity        = quantity        + ? WHERE id = ?`, [newCond.good,    toolId]);
+          if (newCond.damaged > 0) await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`, [newCond.damaged, toolId]);
+          if (newCond.lost    > 0) await runQuery(`UPDATE tools SET lostQuantity    = lostQuantity    + ? WHERE id = ?`, [newCond.lost,    toolId]);
         } else {
-          if (condition === 'good') {
-            await runQuery(
-              `UPDATE tools SET quantity = quantity + ? WHERE id = ?`,
-              [restoreAmount, toolId]
-            );
-          } else if (condition === 'damaged') {
-            await runQuery(
-              `UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`,
-              [restoreAmount, toolId]
-            );
-          } else if (condition === 'lost') {
-            await runQuery(
-              `UPDATE tools SET lostQuantity = lostQuantity + ? WHERE id = ?`,
-              [restoreAmount, toolId]
-            );
-          } else if (condition === 'missing') {
-            // Keep as missing, do not restore
-          }
+          const newCond = expandCondition(condition, restoreAmount);
+
+          if (newCond.good    > 0) await runQuery(`UPDATE tools SET quantity        = quantity        + ? WHERE id = ?`, [newCond.good,    toolId]);
+          if (newCond.damaged > 0) await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`, [newCond.damaged, toolId]);
+          if (newCond.lost    > 0) await runQuery(`UPDATE tools SET lostQuantity    = lostQuantity    + ? WHERE id = ?`, [newCond.lost,    toolId]);
+          // missing: quantities stay at 0 — tool remains unaccounted
         }
 
         // Re-evaluate tool status
@@ -319,8 +320,10 @@ router.put('/:id/checkin', async (req, res) => {
         const activeCount = activeCountRow ? activeCountRow.cnt : 0;
 
         const toolStats = await getQuery(`SELECT quantity, damagedQuantity, lostQuantity FROM tools WHERE id = ?`, [toolId]);
+        const newCond = expandCondition(condition, restoreAmount);
+        const hasMissing = newCond.missing > 0;
         let finalStatus = 'Available';
-        if (activeCount > 0 || (condition === 'missing')) {
+        if (activeCount > 0 || hasMissing) {
           finalStatus = 'In Use';
         } else if (toolStats.quantity === 0 && toolStats.damagedQuantity > 0) {
           finalStatus = 'Damaged';
@@ -342,6 +345,7 @@ router.put('/:id/checkin', async (req, res) => {
     const assignment = await getQuery(`
       SELECT 
         a.id,
+        a.guiaNumber,
         a.checkoutDate,
         a.checkoutNotes,
         a.checkinDate,
@@ -372,7 +376,8 @@ router.put('/:id/checkin', async (req, res) => {
         t.isCalibrable,
         t.calibrationDue,
         t.image,
-        t.customAttributes
+        t.customAttributes,
+        at.quantity as assignedQuantity
       FROM assignment_tools at
       JOIN tools t ON at.toolId = t.id
       WHERE at.assignmentId = ?
@@ -381,11 +386,13 @@ router.put('/:id/checkin', async (req, res) => {
     const parsedTools = tools.map(tool => ({
       ...tool,
       isCalibrable: Boolean(tool.isCalibrable),
-      customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
+      customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {},
+      quantity: tool.assignedQuantity
     }));
 
     const completeAssignment = {
       id: assignment.id,
+      guiaNumber: assignment.guiaNumber,
       checkoutDate: assignment.checkoutDate,
       checkoutNotes: assignment.checkoutNotes,
       checkinDate: assignment.checkinDate,

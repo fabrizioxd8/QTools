@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 export default function ActiveAssignments() {
   const { assignments, checkInAssignment } = useAppData() as any;
   const [checkInDialog, setCheckInDialog] = useState<Assignment | null>(null);
-  const [toolConditions, setToolConditions] = useState<Record<number, 'good' | 'damaged' | 'lost' | 'missing'>>({});
+  const [toolConditions, setToolConditions] = useState<Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>>>({});
   const [editingCompletedAssignment, setEditingCompletedAssignment] = useState<Assignment | null>(null);
   const [checkinNotes, setCheckinNotes] = useState('');
   // Check-in date (YYYY-MM-DD) defaulting to today
@@ -73,9 +73,14 @@ export default function ActiveAssignments() {
 
   const openCheckInDialog = (assignment: Assignment) => {
     setCheckInDialog(assignment);
-    const initialConditions: Record<number, 'good' | 'damaged' | 'lost'> = {};
+    const initialConditions: Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>> = {};
     assignment.tools.forEach(tool => {
-      initialConditions[tool.id] = 'good';
+      initialConditions[tool.id] = {
+        good: tool.quantity || 1,
+        damaged: 0,
+        lost: 0,
+        missing: 0,
+      };
     });
     setToolConditions(initialConditions);
     setCheckinNotes('');
@@ -103,6 +108,16 @@ export default function ActiveAssignments() {
   const handleCheckIn = async () => {
     if (checkInDialog) {
       try {
+        // Validate quantities match total
+        for (const tool of checkInDialog.tools) {
+          const sum = Object.values(toolConditions[tool.id] || {}).reduce((a, b) => Number(a) + Number(b), 0);
+          const expected = tool.quantity || 1;
+          if (sum !== expected) {
+            toast.error(`Quantity mismatch for ${tool.name}. Expected ${expected}, got ${sum}.`);
+            return;
+          }
+        }
+
         // Build ISO datetime from selected date+time
         let checkinDateTime: string | undefined;
         if (checkinDate) {
@@ -126,6 +141,16 @@ export default function ActiveAssignments() {
   const handleEditCheckIn = async () => {
     if (editingCompletedAssignment) {
       try {
+        // Validate quantities match total
+        for (const tool of editingCompletedAssignment.tools) {
+          const sum = Object.values(toolConditions[tool.id] || {}).reduce((a, b) => Number(a) + Number(b), 0);
+          const expected = tool.quantity || 1;
+          if (sum !== expected) {
+            toast.error(`Quantity mismatch for ${tool.name}. Expected ${expected}, got ${sum}.`);
+            return;
+          }
+        }
+
         let checkinDateTime: string | undefined;
         if (checkinDate) {
           const [year, month, day] = checkinDate.split('-').map(Number);
@@ -380,7 +405,34 @@ export default function ActiveAssignments() {
                           size="sm"
                           onClick={() => {
                             setEditingCompletedAssignment(assignment);
-                            setToolConditions(assignment.toolConditions || {});
+                            // Normalize toolConditions: handle both legacy string format
+                            // and new per-condition quantity map format
+                            const normalized: Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>> = {};
+                            assignment.tools.forEach(tool => {
+                              const stored = assignment.toolConditions?.[tool.id];
+                              const expected = tool.quantity || 1;
+                              if (!stored) {
+                                // No condition stored — default all to good
+                                normalized[tool.id] = { good: expected, damaged: 0, lost: 0, missing: 0 };
+                              } else if (typeof stored === 'string') {
+                                // Legacy: single string condition for the whole quantity
+                                normalized[tool.id] = {
+                                  good: stored === 'good' ? expected : 0,
+                                  damaged: stored === 'damaged' ? expected : 0,
+                                  lost: stored === 'lost' ? expected : 0,
+                                  missing: stored === 'missing' ? expected : 0,
+                                };
+                              } else {
+                                // New format: already a map — ensure all keys are numbers
+                                normalized[tool.id] = {
+                                  good: Number(stored.good) || 0,
+                                  damaged: Number(stored.damaged) || 0,
+                                  lost: Number(stored.lost) || 0,
+                                  missing: Number(stored.missing) || 0,
+                                };
+                              }
+                            });
+                            setToolConditions(normalized);
                             setCheckinNotes(assignment.checkinNotes || '');
                             if (assignment.checkinDate) {
                               const date = new Date(assignment.checkinDate);
@@ -406,16 +458,31 @@ export default function ActiveAssignments() {
                           <p className="font-semibold mb-2">Tools:</p>
                           <div className="flex flex-wrap gap-2">
                             {assignment.tools.map(tool => {
-                              const condition = assignment.toolConditions?.[tool.id] || 'good';
-                              const ConditionIcon = getConditionIcon(condition);
+                              const conditions = assignment.toolConditions?.[tool.id];
 
-                              return (
-                                <Badge key={tool.id} className={getConditionBadgeClass(condition)}>
-                                  <ConditionIcon className="mr-1 h-3 w-3" />
-                                  {tool.name} ({condition})
-                                  {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
-                                </Badge>
-                              );
+                              if (!conditions || typeof conditions === 'string') {
+                                const cond = (conditions as unknown as string) || 'good';
+                                const Icon = getConditionIcon(cond as any);
+                                return (
+                                  <Badge key={tool.id} className={getConditionBadgeClass(cond as any)}>
+                                    <Icon className="mr-1 h-3 w-3" />
+                                    {tool.name} ({cond})
+                                    {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
+                                  </Badge>
+                                );
+                              }
+
+                              return Object.entries(conditions as Record<string, number>)
+                                .filter(([_, qty]) => qty > 0)
+                                .map(([cond, qty]) => {
+                                  const Icon = getConditionIcon(cond as any);
+                                  return (
+                                    <Badge key={`${tool.id}-${cond}`} className={getConditionBadgeClass(cond as any)}>
+                                      <Icon className="mr-1 h-3 w-3" />
+                                      {tool.name} ({cond}: {qty})
+                                    </Badge>
+                                  );
+                                });
                             })}
                           </div>
                         </div>
@@ -469,46 +536,57 @@ export default function ActiveAssignments() {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-sm font-semibold">Tool Condition:</Label>
-                    <RadioGroup
-                      value={toolConditions[tool.id] || 'good'}
-                      onValueChange={(value: 'good' | 'damaged' | 'lost' | 'missing') =>
-                        setToolConditions({ ...toolConditions, [tool.id]: value })
-                      }
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="good" id={`${tool.id}-good`} />
-                          <Label htmlFor={`${tool.id}-good`} className="cursor-pointer flex items-center font-normal">
-                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                            Returned in good condition
-                          </Label>
+                  {(() => {
+                    const expected = tool.quantity || 1;
+                    const conditions = toolConditions[tool.id] || { good: 0, damaged: 0, lost: 0, missing: 0 };
+                    const sum = Object.values(conditions).reduce((a, b) => Number(a) + Number(b), 0);
+                    const isOver = sum > expected;
+                    const isMismatch = sum !== expected;
+                    return (
+                      <div className="space-y-3">
+                        <Label className="text-sm font-semibold">Tool Condition Quantities:</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          {(['good', 'missing', 'damaged', 'lost'] as const).map((cond) => (
+                            <div key={cond} className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                {cond === 'good' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                {cond === 'missing' && <Clock className="h-4 w-4 text-yellow-600" />}
+                                {cond === 'damaged' && <AlertCircle className="h-4 w-4 text-orange-600" />}
+                                {cond === 'lost' && <XCircle className="h-4 w-4 text-red-600" />}
+                                <Label htmlFor={`${tool.id}-${cond}`} className="capitalize">{cond}</Label>
+                              </div>
+                              <Input
+                                id={`${tool.id}-${cond}`}
+                                type="number"
+                                min={0}
+                                max={expected}
+                                value={conditions[cond] ?? 0}
+                                className={isOver ? 'border-destructive focus-visible:ring-destructive' : ''}
+                                onChange={(e) => {
+                                  const parsed = parseInt(e.target.value, 10);
+                                  const val = Math.min(Math.max(0, isNaN(parsed) ? 0 : parsed), expected);
+                                  setToolConditions(prev => ({
+                                    ...prev,
+                                    [tool.id]: { ...prev[tool.id], [cond]: val }
+                                  }));
+                                }}
+                              />
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="missing" id={`${tool.id}-missing`} />
-                          <Label htmlFor={`${tool.id}-missing`} className="cursor-pointer flex items-center font-normal">
-                            <Clock className="mr-2 h-4 w-4 text-yellow-600" />
-                            Missing / Not returned yet
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="damaged" id={`${tool.id}-damaged`} />
-                          <Label htmlFor={`${tool.id}-damaged`} className="cursor-pointer flex items-center font-normal">
-                            <AlertCircle className="mr-2 h-4 w-4 text-orange-600" />
-                            Damaged
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="lost" id={`${tool.id}-lost`} />
-                          <Label htmlFor={`${tool.id}-lost`} className="cursor-pointer flex items-center font-normal">
-                            <XCircle className="mr-2 h-4 w-4 text-red-600" />
-                            Lost
-                          </Label>
-                        </div>
+                        {isOver && (
+                          <p className="text-xs text-destructive font-medium">
+                            Total exceeds expected: {sum} / {expected}. Reduce quantities before submitting.
+                          </p>
+                        )}
+                        {!isOver && isMismatch && (
+                          <p className="text-xs text-destructive">
+                            Total assigned: {sum} / Expected: {expected}
+                          </p>
+                        )}
                       </div>
-                    </RadioGroup>
-                  </div>
+                    );
+                  })()}
                 </div>
               ))}
 
@@ -551,7 +629,18 @@ export default function ActiveAssignments() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setCheckInDialog(null)}>Cancel</Button>
-            <Button onClick={handleCheckIn}>Confirm Check-In</Button>
+            <Button
+              onClick={handleCheckIn}
+              disabled={
+                !checkInDialog ||
+                checkInDialog.tools.some(tool => {
+                  const sum = Object.values(toolConditions[tool.id] || {}).reduce((a, b) => Number(a) + Number(b), 0);
+                  return sum !== (tool.quantity || 1);
+                })
+              }
+            >
+              Confirm Check-In
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -582,46 +671,57 @@ export default function ActiveAssignments() {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-3">
-                    <Label className="text-sm font-semibold">Tool Condition:</Label>
-                    <RadioGroup
-                      value={toolConditions[tool.id] || 'good'}
-                      onValueChange={(value: 'good' | 'damaged' | 'lost' | 'missing') =>
-                        setToolConditions({ ...toolConditions, [tool.id]: value })
-                      }
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="good" id={`edit-${tool.id}-good`} />
-                          <Label htmlFor={`edit-${tool.id}-good`} className="cursor-pointer flex items-center font-normal">
-                            <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
-                            Returned in good condition
-                          </Label>
+                  {(() => {
+                    const expected = tool.quantity || 1;
+                    const conditions = toolConditions[tool.id] || { good: 0, damaged: 0, lost: 0, missing: 0 };
+                    const sum = Object.values(conditions).reduce((a, b) => Number(a) + Number(b), 0);
+                    const isOver = sum > expected;
+                    const isMismatch = sum !== expected;
+                    return (
+                      <div className="space-y-3">
+                        <Label className="text-sm font-semibold">Tool Condition Quantities:</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          {(['good', 'missing', 'damaged', 'lost'] as const).map((cond) => (
+                            <div key={cond} className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                {cond === 'good' && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                {cond === 'missing' && <Clock className="h-4 w-4 text-yellow-600" />}
+                                {cond === 'damaged' && <AlertCircle className="h-4 w-4 text-orange-600" />}
+                                {cond === 'lost' && <XCircle className="h-4 w-4 text-red-600" />}
+                                <Label htmlFor={`edit-${tool.id}-${cond}`} className="capitalize">{cond}</Label>
+                              </div>
+                              <Input
+                                id={`edit-${tool.id}-${cond}`}
+                                type="number"
+                                min={0}
+                                max={expected}
+                                value={conditions[cond] ?? 0}
+                                className={isOver ? 'border-destructive focus-visible:ring-destructive' : ''}
+                                onChange={(e) => {
+                                  const parsed = parseInt(e.target.value, 10);
+                                  const val = Math.min(Math.max(0, isNaN(parsed) ? 0 : parsed), expected);
+                                  setToolConditions(prev => ({
+                                    ...prev,
+                                    [tool.id]: { ...prev[tool.id], [cond]: val }
+                                  }));
+                                }}
+                              />
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="missing" id={`edit-${tool.id}-missing`} />
-                          <Label htmlFor={`edit-${tool.id}-missing`} className="cursor-pointer flex items-center font-normal">
-                            <Clock className="mr-2 h-4 w-4 text-yellow-600" />
-                            Missing / Not returned yet
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="damaged" id={`edit-${tool.id}-damaged`} />
-                          <Label htmlFor={`edit-${tool.id}-damaged`} className="cursor-pointer flex items-center font-normal">
-                            <AlertCircle className="mr-2 h-4 w-4 text-orange-600" />
-                            Damaged
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="lost" id={`edit-${tool.id}-lost`} />
-                          <Label htmlFor={`edit-${tool.id}-lost`} className="cursor-pointer flex items-center font-normal">
-                            <XCircle className="mr-2 h-4 w-4 text-red-600" />
-                            Lost
-                          </Label>
-                        </div>
+                        {isOver && (
+                          <p className="text-xs text-destructive font-medium">
+                            Total exceeds expected: {sum} / {expected}. Reduce quantities before submitting.
+                          </p>
+                        )}
+                        {!isOver && isMismatch && (
+                          <p className="text-xs text-destructive">
+                            Total assigned: {sum} / Expected: {expected}
+                          </p>
+                        )}
                       </div>
-                    </RadioGroup>
-                  </div>
+                    );
+                  })()}
                 </div>
               ))}
 
@@ -664,7 +764,18 @@ export default function ActiveAssignments() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingCompletedAssignment(null)}>Cancel</Button>
-            <Button onClick={handleEditCheckIn}>Update Check-In</Button>
+            <Button
+              onClick={handleEditCheckIn}
+              disabled={
+                !editingCompletedAssignment ||
+                editingCompletedAssignment.tools.some(tool => {
+                  const sum = Object.values(toolConditions[tool.id] || {}).reduce((a, b) => Number(a) + Number(b), 0);
+                  return sum !== (tool.quantity || 1);
+                })
+              }
+            >
+              Update Check-In
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

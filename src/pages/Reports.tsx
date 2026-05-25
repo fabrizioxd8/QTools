@@ -94,12 +94,9 @@ export default function Reports() {
       quantity: number;
       extraDetails: Record<string, string>;
       statusLabel?: string;
+      // Per-condition pairs for split badge rendering
+      conditionPairs: Array<{ cond: string; qty: number }>;
     }> = [];
-
-    const conditionLabel = (condition?: 'good' | 'damaged' | 'lost' | 'missing' | string) => {
-      const cond = condition || 'good';
-      return `Status: ${cond.charAt(0).toUpperCase() + cond.slice(1)}`;
-    };
 
     assignments.forEach(assignment => {
       assignment.tools.forEach(tool => {
@@ -124,7 +121,8 @@ export default function Reports() {
           serie: attributes.serie,
           quantity,
           extraDetails,
-          statusLabel: conditionLabel('good'),
+          statusLabel: quantity > 1 ? `Status: Good (${quantity})` : 'Status: Good',
+          conditionPairs: [{ cond: 'good', qty: quantity }],
         });
       });
 
@@ -140,6 +138,19 @@ export default function Reports() {
 
           const condition = assignment.toolConditions?.[tool.id];
 
+          // Build per-condition pairs
+          let conditionPairs: Array<{ cond: string; qty: number }> = [];
+          if (!condition) {
+            conditionPairs = [{ cond: 'good', qty: quantity }];
+          } else if (typeof condition === 'string') {
+            conditionPairs = [{ cond: condition, qty: quantity }];
+          } else {
+            conditionPairs = Object.entries(condition)
+              .filter(([, qty]) => Number(qty) > 0)
+              .map(([cond, qty]) => ({ cond, qty: Number(qty) }));
+            if (conditionPairs.length === 0) conditionPairs = [{ cond: 'good', qty: quantity }];
+          }
+
           log.push({
             date: assignment.checkinDate!,
             dateObj: new Date(assignment.checkinDate!),
@@ -153,7 +164,8 @@ export default function Reports() {
             serie: attributes.serie,
             quantity,
             extraDetails,
-            statusLabel: conditionLabel(condition),
+            statusLabel: undefined,
+            conditionPairs,
           });
         });
       }
@@ -230,12 +242,21 @@ export default function Reports() {
     serie?: string;
     extraDetails: Record<string, string>;
     statusLabel?: string;
+    conditionPairs: Array<{ cond: string; qty: number }>;
+    action: 'Checkout' | 'Check-in';
   }) => {
+    // Build status string from conditionPairs
+    const statusStr = item.conditionPairs.length > 0
+      ? item.conditionPairs
+        .map(({ cond, qty }) => `${cond.charAt(0).toUpperCase() + cond.slice(1)}: ${qty}`)
+        .join(', ')
+      : 'Good';
+
     const detailLines = [
       item.brand ? `Brand: ${item.brand}` : undefined,
       item.model ? `Model: ${item.model}` : undefined,
       item.serie ? `Serie: ${item.serie}` : undefined,
-      item.statusLabel ? `<strong>${item.statusLabel}</strong>` : undefined,
+      `<strong>Status: ${statusStr}</strong>`,
       ...Object.entries(item.extraDetails).map(([key, value]) => `${key}: ${value}`),
     ].filter(Boolean);
 
@@ -710,25 +731,49 @@ export default function Reports() {
                           <Badge
                             className={
                               log.action === 'Checkout'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 border-blue-200/60'
-                                : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 border-green-200/60'
+                                ? 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/50'
+                                : 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50'
                             }
                           >
+                            <span className={`h-1.5 w-1.5 rounded-full ${log.action === 'Checkout' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
                             {log.action}
                           </Badge>
                         </TableCell>
                         <TableCell>{log.worker}</TableCell>
                         <TableCell>{log.project}</TableCell>
                         <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium">{log.tool}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {[log.brand, log.model, log.serie].filter(Boolean).join(' • ')}
-                            </p>
-                            {log.statusLabel && (
-                              <Badge variant={log.statusLabel === 'Status: Good' ? 'outline' : 'destructive'} className="mt-1">
-                                {log.statusLabel}
-                              </Badge>
+                          <div className="space-y-1.5">
+                            <p className="font-medium text-sm">{log.tool}</p>
+                            {[log.brand, log.model, log.serie].filter(Boolean).length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {[log.brand, log.model, log.serie].filter(Boolean).join(' • ')}
+                              </p>
+                            )}
+                            {log.conditionPairs.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {log.conditionPairs.map(({ cond, qty }, i) => {
+                                  const lower = cond.toLowerCase();
+                                  let colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50';
+                                  let dotClass = 'bg-emerald-500';
+                                  if (lower === 'lost') {
+                                    colorClass = 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/50';
+                                    dotClass = 'bg-red-500';
+                                  } else if (lower === 'damaged') {
+                                    colorClass = 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800/50';
+                                    dotClass = 'bg-orange-500';
+                                  } else if (lower === 'missing') {
+                                    colorClass = 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-800/50';
+                                    dotClass = 'bg-yellow-500';
+                                  }
+                                  const label = `${cond.charAt(0).toUpperCase() + cond.slice(1)}: ${qty}`;
+                                  return (
+                                    <span key={i} className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${colorClass}`}>
+                                      <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+                                      {label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             )}
                           </div>
                         </TableCell>

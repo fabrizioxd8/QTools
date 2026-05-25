@@ -28,6 +28,9 @@ export interface Project {
   name: string;
 }
 
+export type ToolConditionString = 'good' | 'damaged' | 'lost' | 'missing';
+export type ToolConditionMap = Record<ToolConditionString, number>;
+
 export interface Assignment {
   id: number;
   checkoutDate: string;
@@ -39,7 +42,8 @@ export interface Assignment {
   checkinDate?: string;
   status: 'active' | 'completed';
   checkinNotes?: string;
-  toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>;
+  // Supports both legacy string format and new per-condition quantity map
+  toolConditions?: Record<number, ToolConditionString | ToolConditionMap>;
 }
 
 interface AppDataContextType {
@@ -58,10 +62,67 @@ interface AppDataContextType {
   updateProject: (id: number, project: Partial<Project>) => void;
   deleteProject: (id: number) => void;
   createAssignment: (assignment: Omit<Assignment, 'id' | 'status'>) => void;
-  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>) => void;
+  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, ToolConditionMap>) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
+
+const enrichToolsWithAssignments = (toolsList: Tool[], asgs: Assignment[]) => {
+  return toolsList.map(tool => {
+    let inUse = 0;
+    let damaged = 0;
+    let lost = 0;
+    let missing = 0;
+
+    asgs.forEach(asg => {
+      if (asg.status === 'active') {
+        const t = asg.tools.find(t => t.id === tool.id);
+        if (t) inUse += (t.quantity || 1);
+      } else if (asg.status === 'completed' && asg.toolConditions) {
+        const cond = asg.toolConditions[tool.id];
+        if (cond) {
+          if (typeof cond === 'object') {
+            damaged += (Number((cond as any).damaged) || 0);
+            lost += (Number((cond as any).lost) || 0);
+            missing += (Number((cond as any).missing) || 0);
+          } else if (typeof cond === 'string') {
+            const qty = asg.tools.find(t => t.id === tool.id)?.quantity || 1;
+            if (cond === 'damaged') damaged += qty;
+            if (cond === 'lost') lost += qty;
+            if (cond === 'missing') missing += qty;
+          }
+        }
+      }
+    });
+
+    const totalOwned = tool.quantity || 1;
+    const available = Math.max(0, totalOwned - inUse - damaged - lost - missing);
+
+    let correctStatus = tool.status;
+    if (tool.status === 'Cal. Due') {
+      correctStatus = 'Cal. Due'; // Preserve explicitly set Cal. Due state
+    } else if (available > 0) correctStatus = 'Available';
+    else if (inUse > 0) correctStatus = 'In Use';
+    else if (missing > 0) correctStatus = 'Missing' as any;
+    else if (damaged > 0) correctStatus = 'Damaged';
+    else if (lost > 0) correctStatus = 'Lost';
+
+    // Auto-fix backend DB implicitly if a mismatched status overwrite is detected
+    if (tool.status !== correctStatus) {
+      apiClient.updateTool(tool.id, { status: correctStatus }).catch(console.error);
+    }
+
+    return {
+      ...tool,
+      status: correctStatus as Tool['status'],
+      damagedQuantity: damaged,
+      lostQuantity: lost,
+      inUseQuantity: inUse,
+      missingQuantity: missing,
+      availableQuantity: available
+    };
+  });
+};
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [tools, setTools] = useState<Tool[]>([]);
@@ -84,7 +145,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
           apiClient.getAssignments(),
         ]);
 
-        setTools(toolsData);
+        // Fix all misconfigured item statuses and separate their quantities appropriately
+        setTools(enrichToolsWithAssignments(toolsData, assignmentsData));
         setWorkers(workersData);
         setProjects(projectsData);
         setAssignments(assignmentsData);
@@ -106,7 +168,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const addTool = async (tool: Omit<Tool, 'id'>) => {
     try {
       const newTool = await apiClient.createTool(tool);
-      setTools([...tools, newTool]);
+      setTools(enrichToolsWithAssignments([...tools, newTool], assignments));
     } catch (error) {
       console.error('Failed to add tool:', error);
       throw error;
@@ -116,7 +178,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const updateTool = async (id: number, updatedTool: Partial<Tool>) => {
     try {
       const updated = await apiClient.updateTool(id, updatedTool);
-      setTools(tools.map(tool => tool.id === id ? updated : tool));
+      const newTools = tools.map(tool => tool.id === id ? updated : tool);
+      setTools(enrichToolsWithAssignments(newTools, assignments));
 
       // Update tools in active assignments (but preserve assignment-specific fields like quantity)
       // Only update display fields like name, category, status, etc.
@@ -217,12 +280,13 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       };
 
       const newAssignment = await apiClient.createAssignment(assignmentData);
+      const newAssignments = [newAssignment, ...assignments];
       // Add new assignment at the beginning to maintain DESC order (newest first)
-      setAssignments([newAssignment, ...assignments]);
+      setAssignments(newAssignments);
 
       // Refresh tools to get updated statuses
       const updatedTools = await apiClient.getTools();
-      setTools(updatedTools);
+      setTools(enrichToolsWithAssignments(updatedTools, newAssignments));
     } catch (error) {
       console.error('Failed to create assignment:', error);
       throw error;
@@ -233,7 +297,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     id: number,
     checkinDate?: string,
     checkinNotes?: string,
-    toolConditions?: Record<number, 'good' | 'damaged' | 'lost' | 'missing'>
+    toolConditions?: Record<number, ToolConditionMap>
   ) => {
     try {
       // If caller provided a full ISO datetime (includes 'T'), use it as-is.
@@ -256,13 +320,14 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         toolConditions
       });
 
-      setAssignments(assignments.map(assignment =>
+      const newAssignments = assignments.map(assignment =>
         assignment.id === id ? updatedAssignment : assignment
-      ));
+      );
+      setAssignments(newAssignments);
 
       // Refresh tools to get updated statuses
       const updatedTools = await apiClient.getTools();
-      setTools(updatedTools);
+      setTools(enrichToolsWithAssignments(updatedTools, newAssignments));
     } catch (error) {
       console.error('Failed to check in assignment:', error);
       throw error;
