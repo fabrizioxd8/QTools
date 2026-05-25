@@ -22,7 +22,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImageUploadBox } from '@/components/ImageUploadBox';
-import { useAppData, Tool } from '@/contexts/AppDataContext';
+import { useAppData, Tool, ToolConditionMap } from '@/contexts/AppDataContext';
 import { matchesSearch } from '@/lib/search';
 import { getUploadUrl } from '@/lib/api';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -125,6 +125,7 @@ export default function ToolsManager() {
 
   const filteredTools = tools
     .filter(tool => {
+      const extTool = tool as ExtendedTool;
       const matchesCategory = categoryFilter === 'All' || tool.category === categoryFilter;
       let matchesStatus = false;
 
@@ -134,24 +135,24 @@ export default function ToolsManager() {
         // Match global status OR specific damaged quantity OR items marked damaged in check-ins
         const hasDamagedInAsg = assignments.some(asg => {
           const cond = asg.toolConditions?.[tool.id];
-          return cond && (typeof cond === 'object' ? Number((cond as any).damaged) > 0 : cond === 'damaged');
+          return cond && (typeof cond === 'object' ? Number((cond as ToolConditionMap).damaged) > 0 : cond === 'damaged');
         });
-        matchesStatus = tool.status === 'Damaged' || ((tool as any).damagedQuantity > 0) || hasDamagedInAsg;
+        matchesStatus = tool.status === 'Damaged' || ((tool.damagedQuantity || 0) > 0) || hasDamagedInAsg;
       } else if (statusFilter === 'Lost') {
         const hasLostInAsg = assignments.some(asg => {
           const cond = asg.toolConditions?.[tool.id];
-          return cond && (typeof cond === 'object' ? Number((cond as any).lost) > 0 : cond === 'lost');
+          return cond && (typeof cond === 'object' ? Number((cond as ToolConditionMap).lost) > 0 : cond === 'lost');
         });
-        matchesStatus = tool.status === 'Lost' || ((tool as any).lostQuantity > 0) || hasLostInAsg;
+        matchesStatus = tool.status === 'Lost' || ((tool.lostQuantity || 0) > 0) || hasLostInAsg;
       } else if (statusFilter === 'Available') {
-        matchesStatus = tool.status === 'Available' || ((tool as any).availableQuantity > 0);
+        matchesStatus = tool.status === 'Available' || ((extTool.availableQuantity || 0) > 0);
       } else if (statusFilter === 'Missing') {
         // Match tools that have missing qty in any completed assignment
         matchesStatus = assignments.some(asg => {
           if (asg.status !== 'completed' || !asg.toolConditions) return false;
           const cond = asg.toolConditions[tool.id];
           if (!cond) return false;
-          if (typeof cond === 'object') return Number((cond as any).missing) > 0;
+          if (typeof cond === 'object') return Number((cond as ToolConditionMap).missing) > 0;
           return cond === 'missing';
         });
       } else if (statusFilter === 'Cal. Due') {
@@ -168,7 +169,7 @@ export default function ToolsManager() {
           matchesStatus = dueDate <= thirtyDaysFromNow;
         }
       } else if (statusFilter === 'In Use') {
-        matchesStatus = tool.status === 'In Use' || ((tool as any).inUseQuantity > 0);
+        matchesStatus = tool.status === 'In Use' || ((extTool.inUseQuantity || 0) > 0);
       } else {
         matchesStatus = tool.status === statusFilter;
       }
@@ -431,7 +432,7 @@ export default function ToolsManager() {
       if (asg.status === 'completed' && asg.toolConditions) {
         const cond = asg.toolConditions[toolId];
         if (cond && typeof cond === 'object') {
-          const missingQty = Number((cond as any).missing) || 0;
+          const missingQty = Number((cond as ToolConditionMap).missing) || 0;
           if (missingQty > 0) {
             entries.push({ projectName: asg.project.name, qty: missingQty, missing: true });
           }
@@ -505,9 +506,9 @@ export default function ToolsManager() {
           if (asg.status === 'completed' && asg.toolConditions) {
             const cond = asg.toolConditions[tool.id];
             if (cond && typeof cond === 'object') {
-              const dmg = Number((cond as any).damaged) || 0;
-              const lost = Number((cond as any).lost) || 0;
-              const missing = Number((cond as any).missing) || 0;
+              const dmg = Number((cond as ToolConditionMap).damaged) || 0;
+              const lost = Number((cond as ToolConditionMap).lost) || 0;
+              const missing = Number((cond as ToolConditionMap).missing) || 0;
               if (dmg > 0) damagedEntries.push({ projectName: asg.project.name, qty: dmg });
               if (lost > 0) lostEntries.push({ projectName: asg.project.name, qty: lost });
               if (missing > 0) missingEntries.push({ projectName: asg.project.name, qty: missing });
@@ -609,8 +610,8 @@ export default function ToolsManager() {
           }
         } else {
           // If filtered, just export based on current view
-          let displayQty = extTool.quantity;
-          let displayStatus = tool.status;
+          const displayQty = extTool.quantity;
+          const displayStatus = tool.status;
 
           if (statusFilter === 'Damaged' && (damagedTotal > 0 || (extTool.damagedQuantity && extTool.damagedQuantity > 0))) {
             const damagedQty = damagedTotal > 0 ? damagedTotal : (extTool.damagedQuantity || 0);

@@ -6,6 +6,12 @@
     ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
     ["cx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
   ],
+  "tailwindCSS.includeLanguages": {
+    "css": "tailwindcss"
+  },
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
   "kiroAgent.configureMCP": "Disabled",
   "[typescriptreact]": {
     "editor.defaultFormatter": "vscode.typescript-language-features"

@@ -167,6 +167,7 @@ QTools works seamlessly across all devices:
 
 ## 📞 Support & Training
 
+- **🗺️ Workflow Guide:** [User Workflow Guide](USER_WORKFLOW_GUIDE.md) for step-by-step UX movements
 - **📖 User Guide:** Comprehensive guide for daily operations
 - **🎥 Training Materials:** Step-by-step tutorials (coming soon)
 - **🔧 Technical Support:** IT deployment and troubleshooting guide

@@ -17,11 +17,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useAppData, Assignment } from '@/contexts/AppDataContext';
+import { useAppData, Assignment, ToolConditionString } from '@/contexts/AppDataContext';
 import { toast } from 'sonner';
 
 export default function ActiveAssignments() {
-  const { assignments, checkInAssignment } = useAppData() as any;
+  const { assignments, checkInAssignment } = useAppData();
   const [checkInDialog, setCheckInDialog] = useState<Assignment | null>(null);
   const [toolConditions, setToolConditions] = useState<Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>>>({});
   const [editingCompletedAssignment, setEditingCompletedAssignment] = useState<Assignment | null>(null);
@@ -462,9 +462,9 @@ export default function ActiveAssignments() {
 
                               if (!conditions || typeof conditions === 'string') {
                                 const cond = (conditions as unknown as string) || 'good';
-                                const Icon = getConditionIcon(cond as any);
+                                const Icon = getConditionIcon(cond as ToolConditionString);
                                 return (
-                                  <Badge key={tool.id} className={getConditionBadgeClass(cond as any)}>
+                                  <Badge key={tool.id} className={getConditionBadgeClass(cond as ToolConditionString)}>
                                     <Icon className="mr-1 h-3 w-3" />
                                     {tool.name} ({cond})
                                     {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
@@ -475,9 +475,9 @@ export default function ActiveAssignments() {
                               return Object.entries(conditions as Record<string, number>)
                                 .filter(([_, qty]) => qty > 0)
                                 .map(([cond, qty]) => {
-                                  const Icon = getConditionIcon(cond as any);
+                                  const Icon = getConditionIcon(cond as ToolConditionString);
                                   return (
-                                    <Badge key={`${tool.id}-${cond}`} className={getConditionBadgeClass(cond as any)}>
+                                    <Badge key={`${tool.id}-${cond}`} className={getConditionBadgeClass(cond as ToolConditionString)}>
                                       <Icon className="mr-1 h-3 w-3" />
                                       {tool.name} ({cond}: {qty})
                                     </Badge>

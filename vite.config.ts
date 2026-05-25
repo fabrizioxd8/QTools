@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   const keyFile = path.join(certPath, 'key.pem');
   const certFile = path.join(certPath, 'cert.pem');
 
-  let httpsConfig = true; // fallback to basic SSL
+  let httpsConfig: undefined | { key: Buffer; cert: Buffer } = undefined; // fallback to basic SSL
 
   try {
     if (fs.existsSync(keyFile) && fs.existsSync(certFile)) {

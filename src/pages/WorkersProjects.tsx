@@ -375,8 +375,9 @@ export default function WorkersProjects() {
                                   <button
                                     className="flex items-center text-left w-full truncate md:cursor-auto"
                                     onClick={() => toggleWorkerExpand(worker.id)}
-                                    aria-expanded={!!expandedWorkerIds.includes(worker.id)}
-                                    aria-controls={expandedWorkerIds.includes(worker.id) ? `details-${worker.id}` : undefined}
+                                    {...(expandedWorkerIds.includes(worker.id)
+                                      ? { 'aria-expanded': true, 'aria-controls': `details-${worker.id}` }
+                                      : { 'aria-expanded': false })}
                                   >
                                     <span className="block truncate">{worker.name}</span>
                                     <span
@@ -503,8 +504,9 @@ export default function WorkersProjects() {
                                   <button
                                     className="flex items-center text-left w-full truncate md:cursor-auto"
                                     onClick={() => toggleProjectExpand(project.id)}
-                                    aria-expanded={!!expandedProjectIds.includes(project.id)}
-                                    aria-controls={expandedProjectIds.includes(project.id) ? `p-details-${project.id}` : undefined}
+                                    {...(expandedProjectIds.includes(project.id)
+                                      ? { 'aria-expanded': true, 'aria-controls': `p-details-${project.id}` }
+                                      : { 'aria-expanded': false })}
                                   >
                                     <span className="block truncate">{project.name}</span>
                                     <span

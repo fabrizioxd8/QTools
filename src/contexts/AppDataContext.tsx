@@ -5,13 +5,16 @@ export interface Tool {
   id: number;
   name: string;
   category: string;
-  status: 'Available' | 'In Use' | 'Damaged' | 'Lost' | 'Cal. Due';
+  status: 'Available' | 'In Use' | 'Damaged' | 'Lost' | 'Cal. Due' | 'Missing';
   isCalibrable: boolean;
   calibrationDue?: string;
   certificateNumber?: string;
   quantity?: number;
   damagedQuantity?: number;
   lostQuantity?: number;
+  inUseQuantity?: number;
+  missingQuantity?: number;
+  availableQuantity?: number;
   // image can be a URL (string) or a File when the user selects one locally
   image?: string | File | null;
   customAttributes: Record<string, string>;
@@ -82,9 +85,9 @@ const enrichToolsWithAssignments = (toolsList: Tool[], asgs: Assignment[]) => {
         const cond = asg.toolConditions[tool.id];
         if (cond) {
           if (typeof cond === 'object') {
-            damaged += (Number((cond as any).damaged) || 0);
-            lost += (Number((cond as any).lost) || 0);
-            missing += (Number((cond as any).missing) || 0);
+            damaged += (Number((cond as ToolConditionMap).damaged) || 0);
+            lost += (Number((cond as ToolConditionMap).lost) || 0);
+            missing += (Number((cond as ToolConditionMap).missing) || 0);
           } else if (typeof cond === 'string') {
             const qty = asg.tools.find(t => t.id === tool.id)?.quantity || 1;
             if (cond === 'damaged') damaged += qty;
@@ -103,7 +106,7 @@ const enrichToolsWithAssignments = (toolsList: Tool[], asgs: Assignment[]) => {
       correctStatus = 'Cal. Due'; // Preserve explicitly set Cal. Due state
     } else if (available > 0) correctStatus = 'Available';
     else if (inUse > 0) correctStatus = 'In Use';
-    else if (missing > 0) correctStatus = 'Missing' as any;
+    else if (missing > 0) correctStatus = 'Missing';
     else if (damaged > 0) correctStatus = 'Damaged';
     else if (lost > 0) correctStatus = 'Lost';
 
@@ -273,7 +276,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const assignmentData = {
         checkoutDate: assignment.checkoutDate,
         checkoutNotes: assignment.checkoutNotes,
-        guiaNumber: (assignment as any).guiaNumber,
+        guiaNumber: assignment.guiaNumber,
         workerId: assignment.worker.id,
         projectId: assignment.project.id,
         tools: toolsPayload
@@ -360,6 +363,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAppData = () => {
   const context = useContext(AppDataContext);
   if (context === undefined) {

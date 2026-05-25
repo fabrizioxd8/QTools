@@ -126,7 +126,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
           project: selectedProject,
           tools: selectedTools,
           guiaNumber: guiaNumber.trim() || undefined,
-        } as any);
+        });
 
         toast.success('Checkout completed successfully!');
 

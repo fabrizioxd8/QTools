@@ -28,6 +28,7 @@ QTools helps you **track tools, prevent loss, and stay organized**. Think of it 
 - Manage the complete tool inventory
 - Monitor calibration schedules
 - Analyze usage patterns and costs
+- Access detailed step-by-step UX flows in the [User Workflow Guide](USER_WORKFLOW_GUIDE.md)
 
 ---
 
@@ -224,10 +225,12 @@ The **Dashboard** is your home page showing:
 
 QTools is continuously improving. Future features include:
 - **User accounts** with personalized dashboards
-- **Barcode scanning** for faster checkout/check-in
-- **Mobile app** for even better phone experience
-- **Advanced reporting** with charts and trends
-- **Maintenance scheduling** for proactive tool care
+- **Barcode & RFID scanning** for lightning-fast checkout/check-in processes
+- **Automated Alerts** via SMS or Email for overdue items and calibration deadlines
+- **Kiosk Mode** for self-service tool checkouts using employee ID badges
+- **Native Mobile app** for even better phone experience with offline support
+- **Advanced predictive analytics** to identify underutilized assets and optimize procurement
+- **Multi-site synchronization** for large organizations with several tool rooms
 
 ---
 
@@ -236,6 +239,7 @@ QTools is continuously improving. Future features include:
 - **Can't find something?** Use the search function
 - **System not working?** Contact your IT department
 - **Have suggestions?** Talk to your tool room manager
+- **Need step-by-step instructions?** Refer to the [User Workflow Guide](USER_WORKFLOW_GUIDE.md)
 
 ---
 
