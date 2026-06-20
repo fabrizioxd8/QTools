@@ -26,7 +26,9 @@ const upload = multer({ storage });
 router.get('/', async (req, res) => {
   try {
     const tools = await allQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber,
+             quantity, damagedQuantity, lostQuantity, image, customAttributes,
+             calibration_company, last_calibration_date, calibration_frequency_months
       FROM tools
       ORDER BY name
     `);
@@ -39,6 +41,9 @@ router.get('/', async (req, res) => {
       quantity: tool.quantity !== undefined && tool.quantity !== null ? Number(tool.quantity) : undefined,
       damagedQuantity: tool.damagedQuantity !== undefined && tool.damagedQuantity !== null ? Number(tool.damagedQuantity) : 0,
       lostQuantity: tool.lostQuantity !== undefined && tool.lostQuantity !== null ? Number(tool.lostQuantity) : 0,
+      calibration_company: tool.calibration_company || null,
+      last_calibration_date: tool.last_calibration_date || null,
+      calibration_frequency_months: tool.calibration_frequency_months !== undefined && tool.calibration_frequency_months !== null ? Number(tool.calibration_frequency_months) : 12,
       customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
     }));
 
@@ -53,7 +58,9 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const tool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber,
+             quantity, damagedQuantity, lostQuantity, image, customAttributes,
+             calibration_company, last_calibration_date, calibration_frequency_months
       FROM tools
       WHERE id = ?
     `, [req.params.id]);
@@ -69,6 +76,9 @@ router.get('/:id', async (req, res) => {
       quantity: tool.quantity !== undefined && tool.quantity !== null ? Number(tool.quantity) : undefined,
       damagedQuantity: tool.damagedQuantity !== undefined && tool.damagedQuantity !== null ? Number(tool.damagedQuantity) : 0,
       lostQuantity: tool.lostQuantity !== undefined && tool.lostQuantity !== null ? Number(tool.lostQuantity) : 0,
+      calibration_company: tool.calibration_company || null,
+      last_calibration_date: tool.last_calibration_date || null,
+      calibration_frequency_months: tool.calibration_frequency_months !== undefined && tool.calibration_frequency_months !== null ? Number(tool.calibration_frequency_months) : 12,
       customAttributes: tool.customAttributes ? JSON.parse(tool.customAttributes) : {}
     };
 
@@ -82,29 +92,46 @@ router.get('/:id', async (req, res) => {
 // POST /api/tools - Create new tool
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-  const { name, category, status = 'Available', isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl } = req.body;
+  const { name, category, status = 'Available', isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl,
+          calibration_company, last_calibration_date, calibration_frequency_months } = req.body;
     // Handle both file uploads and URL inputs
     const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl || null);
   // Coerce isCalibrable which may come as string from FormData
   const isCalibrableFlag = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
 
+  // Calculate calibration_due_date from last_calibration_date + calibration_frequency_months
+  let computedCalibrationDue = calibrationDue || null;
+  if (isCalibrableFlag && last_calibration_date && calibration_frequency_months) {
+    const lastDate = new Date(last_calibration_date);
+    if (!isNaN(lastDate.getTime())) {
+      lastDate.setMonth(lastDate.getMonth() + Number(calibration_frequency_months));
+      computedCalibrationDue = lastDate.toISOString().split('T')[0];
+    }
+  }
+
     const result = await runQuery(`
-      INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tools (name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, image, customAttributes,
+                         calibration_company, last_calibration_date, calibration_frequency_months)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name,
       category,
       status,
       isCalibrableFlag ? 1 : 0,
-      calibrationDue || null,
+      computedCalibrationDue,
       certificateNumber || null,
       typeof quantity !== 'undefined' ? Number(quantity) : 1,
       image,
-      customAttributes || '{}'
+      customAttributes || '{}',
+      isCalibrableFlag ? (calibration_company || null) : null,
+      isCalibrableFlag ? (last_calibration_date || null) : null,
+      isCalibrableFlag ? (Number(calibration_frequency_months) || 12) : 12,
     ]);
 
     const newTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber,
+             quantity, damagedQuantity, lostQuantity, image, customAttributes,
+             calibration_company, last_calibration_date, calibration_frequency_months
       FROM tools
       WHERE id = ?
     `, [result.id]);
@@ -116,6 +143,9 @@ router.post('/', upload.single('image'), async (req, res) => {
       quantity: newTool.quantity !== undefined && newTool.quantity !== null ? Number(newTool.quantity) : undefined,
       damagedQuantity: newTool.damagedQuantity !== undefined && newTool.damagedQuantity !== null ? Number(newTool.damagedQuantity) : 0,
       lostQuantity: newTool.lostQuantity !== undefined && newTool.lostQuantity !== null ? Number(newTool.lostQuantity) : 0,
+      calibration_company: newTool.calibration_company || null,
+      last_calibration_date: newTool.last_calibration_date || null,
+      calibration_frequency_months: newTool.calibration_frequency_months !== undefined && newTool.calibration_frequency_months !== null ? Number(newTool.calibration_frequency_months) : 12,
       customAttributes: newTool.customAttributes ? JSON.parse(newTool.customAttributes) : {}
     };
 
@@ -129,7 +159,8 @@ router.post('/', upload.single('image'), async (req, res) => {
 // PUT /api/tools/:id - Update tool
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
-  const { name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl } = req.body;
+  const { name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, customAttributes, imageUrl,
+          calibration_company, last_calibration_date, calibration_frequency_months } = req.body;
     // Handle both file uploads and URL inputs
     const image = req.file ? `/uploads/${req.file.filename}` : (imageUrl !== undefined ? imageUrl : undefined);
 
@@ -149,15 +180,41 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateFields.push('status = ?');
       updateValues.push(status);
     }
+
+    let isCalibrableFlagUpdate;
     if (isCalibrable !== undefined) {
-      const isCalibrableFlagUpdate = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
+      isCalibrableFlagUpdate = isCalibrable === true || isCalibrable === 'true' || isCalibrable === '1' || Number(isCalibrable) === 1;
       updateFields.push('isCalibrable = ?');
       updateValues.push(isCalibrableFlagUpdate ? 1 : 0);
     }
-    if (calibrationDue !== undefined) {
+
+    // Determine final calibration_due from provided value or recalculate
+    if (calibrationDue !== undefined || last_calibration_date !== undefined || calibration_frequency_months !== undefined) {
+      // Fetch current tool data to fill in missing values for recalculation
+      const currentTool = await getQuery(`SELECT isCalibrable, last_calibration_date, calibration_frequency_months, calibrationDue FROM tools WHERE id = ?`, [req.params.id]);
+      const effectiveIsCalibrable = isCalibrableFlagUpdate !== undefined
+        ? isCalibrableFlagUpdate
+        : Boolean(Number(currentTool?.isCalibrable));
+      const effectiveLastDate = last_calibration_date !== undefined ? last_calibration_date : currentTool?.last_calibration_date;
+      const effectiveFrequency = calibration_frequency_months !== undefined ? Number(calibration_frequency_months) : (currentTool?.calibration_frequency_months || 12);
+
+      // Recalculate calibrationDue when calibration fields change
+      let newCalibrationDue = calibrationDue !== undefined ? (calibrationDue || null) : currentTool?.calibrationDue;
+      if (effectiveIsCalibrable && effectiveLastDate && effectiveFrequency) {
+        const lastDate = new Date(effectiveLastDate);
+        if (!isNaN(lastDate.getTime())) {
+          lastDate.setMonth(lastDate.getMonth() + effectiveFrequency);
+          newCalibrationDue = lastDate.toISOString().split('T')[0];
+        }
+      }
+
+      updateFields.push('calibrationDue = ?');
+      updateValues.push(newCalibrationDue || null);
+    } else if (calibrationDue !== undefined) {
       updateFields.push('calibrationDue = ?');
       updateValues.push(calibrationDue || null);
     }
+
     if (certificateNumber !== undefined) {
       updateFields.push('certificateNumber = ?');
       updateValues.push(certificateNumber || null);
@@ -174,6 +231,18 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateFields.push('customAttributes = ?');
       updateValues.push(customAttributes || '{}');
     }
+    if (calibration_company !== undefined) {
+      updateFields.push('calibration_company = ?');
+      updateValues.push(calibration_company || null);
+    }
+    if (last_calibration_date !== undefined) {
+      updateFields.push('last_calibration_date = ?');
+      updateValues.push(last_calibration_date || null);
+    }
+    if (calibration_frequency_months !== undefined) {
+      updateFields.push('calibration_frequency_months = ?');
+      updateValues.push(Number(calibration_frequency_months) || 12);
+    }
 
     updateFields.push('updated_at = CURRENT_TIMESTAMP');
     updateValues.push(req.params.id);
@@ -185,7 +254,9 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     `, updateValues);
 
     const updatedTool = await getQuery(`
-      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber, quantity, damagedQuantity, lostQuantity, image, customAttributes
+      SELECT id, name, category, status, isCalibrable, calibrationDue, certificateNumber,
+             quantity, damagedQuantity, lostQuantity, image, customAttributes,
+             calibration_company, last_calibration_date, calibration_frequency_months
       FROM tools
       WHERE id = ?
     `, [req.params.id]);
@@ -201,6 +272,9 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       quantity: updatedTool.quantity !== undefined && updatedTool.quantity !== null ? Number(updatedTool.quantity) : undefined,
       damagedQuantity: updatedTool.damagedQuantity !== undefined && updatedTool.damagedQuantity !== null ? Number(updatedTool.damagedQuantity) : 0,
       lostQuantity: updatedTool.lostQuantity !== undefined && updatedTool.lostQuantity !== null ? Number(updatedTool.lostQuantity) : 0,
+      calibration_company: updatedTool.calibration_company || null,
+      last_calibration_date: updatedTool.last_calibration_date || null,
+      calibration_frequency_months: updatedTool.calibration_frequency_months !== undefined && updatedTool.calibration_frequency_months !== null ? Number(updatedTool.calibration_frequency_months) : 12,
       customAttributes: updatedTool.customAttributes ? JSON.parse(updatedTool.customAttributes) : {}
     };
 

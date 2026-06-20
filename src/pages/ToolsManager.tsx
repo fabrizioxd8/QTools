@@ -46,7 +46,7 @@ import {
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools', 'Cleaning and Maintenance', 'Workstation Equipment'];
 const statuses: (Tool['status'] | 'Missing')[] = ['Available', 'In Use', 'Damaged', 'Lost', 'Missing', 'Cal. Due'];
 
-const standardAttributes = ['Brand', 'Model', 'Serial Number', 'Location', 'Purchase Date', 'Custom'];
+const standardAttributes = ['Brand', 'Model', 'Serial Number', 'Custom'];
 
 export default function ToolsManager() {
   const { tools, addTool, updateTool, deleteTool, assignments } = useAppData();
@@ -95,6 +95,9 @@ export default function ToolsManager() {
     quantity: 1,
     image: null as string | File | null,
     customAttributes: {} as Record<string, string>,
+    calibration_company: '',
+    last_calibration_date: '',
+    calibration_frequency_months: 12,
   });
 
   const [newAttrKeyType, setNewAttrKeyType] = useState('Brand');
@@ -214,6 +217,9 @@ export default function ToolsManager() {
         quantity: displayQty,
         image: tool.image || null,
         customAttributes: { ...tool.customAttributes },
+        calibration_company: tool.calibration_company || '',
+        last_calibration_date: tool.last_calibration_date || '',
+        calibration_frequency_months: tool.calibration_frequency_months ?? 12,
       });
     } else {
       setEditingTool(null);
@@ -227,6 +233,9 @@ export default function ToolsManager() {
         quantity: 1,
         image: null,
         customAttributes: {},
+        calibration_company: '',
+        last_calibration_date: '',
+        calibration_frequency_months: 12,
       });
     }
     // Clear custom attribute input fields
@@ -281,7 +290,6 @@ export default function ToolsManager() {
         await addTool({ ...formData });
         toast.success('Tool added successfully');
       }
-
       setIsDialogOpen(false);
       // Clear custom attribute input fields
       setNewAttrKey('');
@@ -478,156 +486,163 @@ export default function ToolsManager() {
 
   const handleExportExcel = () => {
     try {
-      // The standard attributes that should get their own columns (excluding 'Custom')
-      const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
-
-      // Expand tools into rows based on quantity fields if filtering by 'All'
       const data: Record<string, string | number>[] = [];
-      // Always use filteredTools so category/search filters are respected
       const toolsToExport = filteredTools;
 
       toolsToExport.forEach(tool => {
         const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
 
-        // Calculate real-time In Use quantity and project list from active assignments
-        const inUseEntries: Array<{ projectName: string; qty: number }> = [];
-        const damagedEntries: Array<{ projectName: string; qty: number }> = [];
-        const lostEntries: Array<{ projectName: string; qty: number }> = [];
-        const missingEntries: Array<{ projectName: string; qty: number }> = [];
+        // Gather active assignment info for this tool
+        const activeAssignments = assignments.filter(asg =>
+          asg.status === 'active' && asg.tools.some(t => t.id === tool.id)
+        );
 
-        assignments.forEach(asg => {
-          if (asg.status === 'active') {
-            asg.tools.forEach(t => {
-              if (t.id === tool.id) {
-                inUseEntries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
-              }
+        const inUseTotal = activeAssignments.reduce((sum, asg) => {
+          const t = asg.tools.find(t => t.id === tool.id);
+          return sum + (t?.quantity || 1);
+        }, 0);
+
+        const assignedProjectList = Array.from(
+          new Set(activeAssignments.map(asg => asg.project.name))
+        ).join(', ');
+
+        // Get guia de remision: from the most recent active assignment for this tool
+        // If no active, try the most recent completed assignment
+        let guiaDeRemision = '';
+        if (activeAssignments.length > 0) {
+          // Sort by checkoutDate desc, take first
+          const lastActive = [...activeAssignments].sort(
+            (a, b) => new Date(b.checkoutDate).getTime() - new Date(a.checkoutDate).getTime()
+          )[0];
+          guiaDeRemision = lastActive.guiaNumber || '';
+        } else {
+          // No active assignment — look at completed ones that had this tool
+          const completedWithTool = assignments
+            .filter(asg => asg.status === 'completed' && asg.tools.some(t => t.id === tool.id))
+            .sort((a, b) => {
+              const aDate = a.checkinDate ? new Date(a.checkinDate).getTime() : 0;
+              const bDate = b.checkinDate ? new Date(b.checkinDate).getTime() : 0;
+              return bDate - aDate;
             });
+          if (completedWithTool.length > 0) {
+            guiaDeRemision = completedWithTool[0].guiaNumber || '';
           }
-          if (asg.status === 'completed' && asg.toolConditions) {
-            const cond = asg.toolConditions[tool.id];
-            if (cond && typeof cond === 'object') {
-              const dmg = Number((cond as ToolConditionMap).damaged) || 0;
-              const lost = Number((cond as ToolConditionMap).lost) || 0;
-              const missing = Number((cond as ToolConditionMap).missing) || 0;
-              if (dmg > 0) damagedEntries.push({ projectName: asg.project.name, qty: dmg });
-              if (lost > 0) lostEntries.push({ projectName: asg.project.name, qty: lost });
-              if (missing > 0) missingEntries.push({ projectName: asg.project.name, qty: missing });
-            } else if (typeof cond === 'string') {
-              const qty = asg.tools.find(t => t.id === tool.id)?.quantity || 1;
-              if (cond === 'damaged') damagedEntries.push({ projectName: asg.project.name, qty });
-              if (cond === 'lost') lostEntries.push({ projectName: asg.project.name, qty });
-              if (cond === 'missing') missingEntries.push({ projectName: asg.project.name, qty });
-            }
+        }
+
+        // Build extra information from non-standard custom attributes
+        const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
+        // Keys that are already mapped to dedicated columns — exclude from Observaciones
+        const dedicatedKeys = new Set([
+          'Brand', 'Marca', 'brand', 'marca',
+          'Model', 'Modelo', 'model', 'modelo',
+          'Serial Number', 'Serie', 'serial_number', 'serie',
+        ]);
+        const extraInfo: string[] = [];
+        Object.entries(tool.customAttributes).forEach(([key, value]) => {
+          if (!standardKeys.includes(key) && !dedicatedKeys.has(key)) {
+            extraInfo.push(`${key}: ${value}`);
           }
         });
+        const observaciones = extraInfo.join(' | ');
 
-        const inUseTotal = inUseEntries.reduce((sum, e) => sum + e.qty, 0);
-        const damagedTotal = damagedEntries.reduce((sum, e) => sum + e.qty, 0);
-        const lostTotal = lostEntries.reduce((sum, e) => sum + e.qty, 0);
-        const missingTotal = missingEntries.reduce((sum, e) => sum + e.qty, 0);
-        const assignedProjectList = Array.from(new Set(inUseEntries.map(e => e.projectName))).join(', ');
-        const damagedProjectList = Array.from(new Set(damagedEntries.map(e => e.projectName))).join(', ');
-        const lostProjectList = Array.from(new Set(lostEntries.map(e => e.projectName))).join(', ');
-        const missingProjectList = Array.from(new Set(missingEntries.map(e => e.projectName))).join(', ');
+        // Helper to build a row with the required Spanish headers
+        const buildRow = (
+          status: string,
+          qty: number,
+          projectAssigned: string,
+          guia: string
+        ): Record<string, string | number> => ({
+          'Instrumento': tool.name,
+          'Categoría': tool.category,
+          'Marca': tool.customAttributes['Brand'] || tool.customAttributes['Marca'] || '',
+          'Modelo': tool.customAttributes['Model'] || tool.customAttributes['Modelo'] || '',
+          'Serie': tool.customAttributes['Serial Number'] || tool.customAttributes['Serie'] || '',
+          'Estado del Equipo': status,
+          'Cantidad': qty,
+          'Proyecto Asignado': projectAssigned,
+          'Guía de Remisión': guia,
+          '¿Requiere Calibración?': tool.isCalibrable ? 'Sí' : 'No',
+          'Empresa Certificadora': tool.isCalibrable ? (tool.calibration_company || '') : '',
+          'Nº Certificado': extTool.certificateNumber || '',
+          'Última Calibración': tool.isCalibrable ? (tool.last_calibration_date || '') : '',
+          'Frecuencia (Meses)': tool.isCalibrable ? (tool.calibration_frequency_months ?? 12) : '',
+          'Próxima Calibración': tool.isCalibrable ? (tool.calibrationDue || '') : '',
+          'Observaciones': observaciones,
+        });
 
-        // Base row data
-        const getBaseRow = (status: string, qty: number, projects: string = ''): Record<string, string | number> => {
-          const row: Record<string, string | number> = {
-            'Name': tool.name,
-            'Category': tool.category,
-            'Status': status,
-            'Quantity': qty,
-            'Project Assigned': projects,
-            'Requires Calibration': tool.isCalibrable ? 'Yes' : 'No',
-            'Calibration Due': tool.calibrationDue || '',
-            'Certificate Number': extTool.certificateNumber || '',
-          };
-
-          standardKeys.forEach(key => {
-            row[key] = tool.customAttributes[key] || '';
-          });
-
-          const extraInfo: string[] = [];
-          Object.entries(tool.customAttributes).forEach(([key, value]) => {
-            if (!standardKeys.includes(key)) {
-              extraInfo.push(`${key}: ${value}`);
-            }
-          });
-          row['EXTRA INFORMATION'] = extraInfo.join(' | ');
-          return row;
-        };
-
-        // If filtering by 'All', expand rows
         if (statusFilter === 'All') {
           let hasExported = false;
 
           if (extTool.quantity !== undefined && extTool.quantity > 0) {
-            // If the tool is globally marked as Lost or Damaged, use that status instead of "Available"
             const displayStatus = (tool.status === 'Lost' || tool.status === 'Damaged' || tool.status === 'Cal. Due') ? tool.status : 'Available';
-            data.push(getBaseRow(displayStatus, extTool.quantity));
+            data.push(buildRow(displayStatus, extTool.quantity, '', ''));
             hasExported = true;
           }
           if (inUseTotal > 0) {
-            data.push(getBaseRow('In Use', inUseTotal, assignedProjectList));
+            data.push(buildRow('In Use', inUseTotal, assignedProjectList, guiaDeRemision));
             hasExported = true;
           }
-          // Use assignment-derived totals as source of truth (DB fields may lag)
+
+          const damagedTotal = assignments.reduce((sum, asg) => {
+            if (asg.status !== 'completed' || !asg.toolConditions) return sum;
+            const cond = asg.toolConditions[tool.id];
+            if (!cond) return sum;
+            if (typeof cond === 'object') return sum + (Number((cond as ToolConditionMap).damaged) || 0);
+            return cond === 'damaged' ? sum + (asg.tools.find(t => t.id === tool.id)?.quantity || 1) : sum;
+          }, 0);
+          const lostTotal = assignments.reduce((sum, asg) => {
+            if (asg.status !== 'completed' || !asg.toolConditions) return sum;
+            const cond = asg.toolConditions[tool.id];
+            if (!cond) return sum;
+            if (typeof cond === 'object') return sum + (Number((cond as ToolConditionMap).lost) || 0);
+            return cond === 'lost' ? sum + (asg.tools.find(t => t.id === tool.id)?.quantity || 1) : sum;
+          }, 0);
+          const missingTotal = assignments.reduce((sum, asg) => {
+            if (asg.status !== 'completed' || !asg.toolConditions) return sum;
+            const cond = asg.toolConditions[tool.id];
+            if (!cond) return sum;
+            if (typeof cond === 'object') return sum + (Number((cond as ToolConditionMap).missing) || 0);
+            return cond === 'missing' ? sum + (asg.tools.find(t => t.id === tool.id)?.quantity || 1) : sum;
+          }, 0);
+
           const damagedQty = damagedTotal > 0 ? damagedTotal : (extTool.damagedQuantity || 0);
           const lostQty = lostTotal > 0 ? lostTotal : (extTool.lostQuantity || 0);
-          if (damagedQty > 0 && tool.status !== 'Damaged') {
-            data.push(getBaseRow('Damaged', damagedQty, damagedProjectList));
-            hasExported = true;
-          }
-          if (lostQty > 0 && tool.status !== 'Lost') {
-            data.push(getBaseRow('Lost', lostQty, lostProjectList));
-            hasExported = true;
-          }
-          if (missingTotal > 0) {
-            data.push(getBaseRow('Missing', missingTotal, missingProjectList));
-            hasExported = true;
-          }
-          // Cal. Due: only emit a row if this tool is in the Cal. Due filter set.
-          // Pre-check using the same logic as filteredTools to avoid false positives.
+          if (damagedQty > 0 && tool.status !== 'Damaged') { data.push(buildRow('Damaged', damagedQty, '', '')); hasExported = true; }
+          if (lostQty > 0 && tool.status !== 'Lost') { data.push(buildRow('Lost', lostQty, '', '')); hasExported = true; }
+          if (missingTotal > 0) { data.push(buildRow('Missing', missingTotal, '', '')); hasExported = true; }
+
           const isCalDue = (() => {
             if (!tool.isCalibrable || !tool.calibrationDue) return false;
             if (tool.status === 'Cal. Due') return true;
             const dueDate = new Date(`${tool.calibrationDue}T00:00:00`);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const thirtyDaysFromNow = new Date(today);
-            thirtyDaysFromNow.setDate(today.getDate() + 30);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const thirtyDaysFromNow = new Date(today); thirtyDaysFromNow.setDate(today.getDate() + 30);
             return dueDate <= thirtyDaysFromNow;
           })();
           if (isCalDue) {
             const calQty = (extTool.quantity || 0) + inUseTotal;
-            data.push(getBaseRow('Cal. Due', calQty > 0 ? calQty : 1));
+            data.push(buildRow('Cal. Due', calQty > 0 ? calQty : 1, assignedProjectList, guiaDeRemision));
             hasExported = true;
           }
 
-          // Fallback if all quantities are 0 but the tool exists
           if (!hasExported) {
-            data.push(getBaseRow(tool.status, extTool.quantity || 0));
+            data.push(buildRow(tool.status, extTool.quantity || 0, assignedProjectList, guiaDeRemision));
           }
         } else {
-          // If filtered, just export based on current view
-          const displayQty = extTool.quantity;
-          const displayStatus = tool.status;
-
-          if (statusFilter === 'Damaged' && (damagedTotal > 0 || (extTool.damagedQuantity && extTool.damagedQuantity > 0))) {
-            const damagedQty = damagedTotal > 0 ? damagedTotal : (extTool.damagedQuantity || 0);
-            data.push(getBaseRow('Damaged', damagedQty, damagedProjectList));
-          } else if (statusFilter === 'Lost' && (lostTotal > 0 || (extTool.lostQuantity && extTool.lostQuantity > 0))) {
-            const lostQty = lostTotal > 0 ? lostTotal : (extTool.lostQuantity || 0);
-            data.push(getBaseRow('Lost', lostQty, lostProjectList));
-          } else if (statusFilter === 'In Use' && missingTotal > 0 && inUseTotal === 0) {
-            data.push(getBaseRow('Missing', missingTotal, missingProjectList));
+          // Filtered view — single row per tool based on active filter
+          if (statusFilter === 'In Use') {
+            data.push(buildRow('In Use', inUseTotal || (extTool as { inUseQuantity?: number }).inUseQuantity || 0, assignedProjectList, guiaDeRemision));
+          } else if (statusFilter === 'Damaged') {
+            data.push(buildRow('Damaged', (extTool as { damagedQuantity?: number }).damagedQuantity || 0, '', ''));
+          } else if (statusFilter === 'Lost') {
+            data.push(buildRow('Lost', (extTool as { lostQuantity?: number }).lostQuantity || 0, '', ''));
           } else if (statusFilter === 'Missing') {
-            data.push(getBaseRow('Missing', missingTotal, missingProjectList));
+            data.push(buildRow('Missing', (extTool as { missingQuantity?: number }).missingQuantity || 0, '', ''));
           } else if (statusFilter === 'Cal. Due') {
             const calQty = (extTool.quantity || 0) + inUseTotal;
-            data.push(getBaseRow('Cal. Due', calQty > 0 ? calQty : 1));
+            data.push(buildRow('Cal. Due', calQty > 0 ? calQty : 1, assignedProjectList, guiaDeRemision));
           } else {
-            data.push(getBaseRow(displayStatus, displayQty || 1));
+            data.push(buildRow(tool.status, extTool.quantity || 1, assignedProjectList, guiaDeRemision));
           }
         }
       });
@@ -635,9 +650,9 @@ export default function ToolsManager() {
       // Create worksheet and workbook
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventory');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Inventario');
 
-      // --- Formatted table ---
+      // --- Formatting ---
       const numRows = data.length;
       const numCols = data.length > 0 ? Object.keys(data[0]).length : 0;
 
@@ -653,14 +668,9 @@ export default function ToolsManager() {
         };
 
         const lastCol = colLetter(numCols - 1);
-
-        // Autofilter — gives native Excel column filter dropdowns on every header
         worksheet['!autofilter'] = { ref: `A1:${lastCol}1` };
-
-        // Freeze the header row so it stays visible while scrolling
         worksheet['!freeze'] = { xSplit: 0, ySplit: 1 };
 
-        // Auto-fit column widths based on content
         const colWidths = Object.keys(data[0]).map(header => {
           const maxLen = data.reduce((max, row) => {
             const val = row[header];
@@ -670,7 +680,6 @@ export default function ToolsManager() {
         });
         worksheet['!cols'] = colWidths;
 
-        // Style header row: bold + teal background
         const headers = Object.keys(data[0]);
         headers.forEach((_, colIdx) => {
           const cellAddr = `${colLetter(colIdx)}1`;
@@ -683,7 +692,6 @@ export default function ToolsManager() {
           };
         });
 
-        // Banded row fill for data rows (alternating white / light teal)
         for (let rowIdx = 2; rowIdx <= numRows + 1; rowIdx++) {
           const fillColor = rowIdx % 2 === 0 ? 'E6F4F3' : 'FFFFFF';
           for (let colIdx = 0; colIdx < numCols; colIdx++) {
@@ -698,15 +706,14 @@ export default function ToolsManager() {
         }
       }
 
-      // Generate Excel file buffer — use xlsx full write for style support
       const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
       const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
 
       // Save file
       const dateString = new Date().toISOString().split('T')[0];
-      saveAs(dataBlob, `Inventory_Export_${dateString}.xlsx`);
+      saveAs(dataBlob, `Inventario_${dateString}.xlsx`);
 
-      toast.success('Inventory exported successfully');
+      toast.success('Inventario exportado correctamente');
     } catch (error) {
       console.error('Export failed:', error);
       toast.error('Failed to export inventory');
@@ -1210,27 +1217,84 @@ export default function ToolsManager() {
                 </div>
 
                 {formData.isCalibrable && (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Calibration Due Date</Label>
-                      <Input
-                        type="date"
-                        value={formData.calibrationDue}
-                        onChange={(e) => setFormData({ ...formData, calibrationDue: e.target.value })}
-                        disabled={isReadOnly}
-                        className="h-11"
-                      />
+                  <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Empresa Certificadora</Label>
+                        <Input
+                          value={formData.calibration_company}
+                          onChange={(e) => setFormData({ ...formData, calibration_company: e.target.value })}
+                          disabled={isReadOnly}
+                          placeholder="Ej. Bureau Veritas"
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Certificate N°</Label>
+                        <Input
+                          value={formData.certificateNumber}
+                          onChange={(e) => setFormData({ ...formData, certificateNumber: e.target.value })}
+                          disabled={isReadOnly}
+                          placeholder="Número de certificado"
+                          className="h-11"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Certificate N°</Label>
-                      <Input
-                        value={formData.certificateNumber}
-                        onChange={(e) => setFormData({ ...formData, certificateNumber: e.target.value })}
-                        disabled={isReadOnly}
-                        placeholder="Certificate number"
-                        className="h-11"
-                      />
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Última Calibración</Label>
+                        <Input
+                          type="date"
+                          value={formData.last_calibration_date}
+                          onChange={(e) => {
+                            const newLastDate = e.target.value;
+                            // Auto-calculate next calibration due date
+                            let newDue = formData.calibrationDue;
+                            if (newLastDate && formData.calibration_frequency_months) {
+                              const d = new Date(newLastDate);
+                              if (!isNaN(d.getTime())) {
+                                d.setMonth(d.getMonth() + Number(formData.calibration_frequency_months));
+                                newDue = d.toISOString().split('T')[0];
+                              }
+                            }
+                            setFormData({ ...formData, last_calibration_date: newLastDate, calibrationDue: newDue });
+                          }}
+                          disabled={isReadOnly}
+                          className="h-11"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Frecuencia (Meses)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={formData.calibration_frequency_months}
+                          onChange={(e) => {
+                            const newFreq = Number(e.target.value) || 12;
+                            // Recalculate due date if last_calibration_date is set
+                            let newDue = formData.calibrationDue;
+                            if (formData.last_calibration_date) {
+                              const d = new Date(formData.last_calibration_date);
+                              if (!isNaN(d.getTime())) {
+                                d.setMonth(d.getMonth() + newFreq);
+                                newDue = d.toISOString().split('T')[0];
+                              }
+                            }
+                            setFormData({ ...formData, calibration_frequency_months: newFreq, calibrationDue: newDue });
+                          }}
+                          disabled={isReadOnly}
+                          className="h-11"
+                        />
+                      </div>
                     </div>
+                    {formData.calibrationDue && (
+                      <div className="p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-semibold">Próxima Calibración (calculada):</span>{' '}
+                          {new Date(`${formData.calibrationDue}T00:00:00`).toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

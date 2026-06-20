@@ -74,6 +74,11 @@ class ApiClient {
     }
     
     formData.append('customAttributes', JSON.stringify(tool.customAttributes || {}));
+
+    // Calibration extended fields
+    if (tool.calibration_company !== undefined) formData.append('calibration_company', tool.calibration_company || '');
+    if (tool.last_calibration_date !== undefined) formData.append('last_calibration_date', tool.last_calibration_date || '');
+    if (tool.calibration_frequency_months !== undefined) formData.append('calibration_frequency_months', String(tool.calibration_frequency_months || 12));
     
     const url = `${this.baseUrl}/tools`;
     
@@ -111,6 +116,11 @@ class ApiClient {
     if (tool.customAttributes) formData.append('customAttributes', JSON.stringify(tool.customAttributes));
     if (tool.certificateNumber !== undefined) formData.append('certificateNumber', tool.certificateNumber || '');
     if (tool.quantity !== undefined) formData.append('quantity', String(tool.quantity));
+
+    // Calibration extended fields
+    if (tool.calibration_company !== undefined) formData.append('calibration_company', tool.calibration_company || '');
+    if (tool.last_calibration_date !== undefined) formData.append('last_calibration_date', tool.last_calibration_date || '');
+    if (tool.calibration_frequency_months !== undefined) formData.append('calibration_frequency_months', String(tool.calibration_frequency_months || 12));
     
     const url = `${this.baseUrl}/tools/${id}`;
     
@@ -210,6 +220,7 @@ class ApiClient {
     checkinDate?: string;
     checkinNotes?: string;
     toolConditions?: Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>>;
+    return_guide?: string;
   }): Promise<Assignment> {
     return this.request<Assignment>(`/assignments/${id}/checkin`, {
       method: 'PUT',

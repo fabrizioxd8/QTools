@@ -18,6 +18,10 @@ export interface Tool {
   // image can be a URL (string) or a File when the user selects one locally
   image?: string | File | null;
   customAttributes: Record<string, string>;
+  // Calibration extended fields
+  calibration_company?: string | null;
+  last_calibration_date?: string | null;
+  calibration_frequency_months?: number;
 }
 
 export interface Worker {
@@ -45,6 +49,7 @@ export interface Assignment {
   checkinDate?: string;
   status: 'active' | 'completed';
   checkinNotes?: string;
+  return_guide?: string | null;
   // Supports both legacy string format and new per-condition quantity map
   toolConditions?: Record<number, ToolConditionString | ToolConditionMap>;
 }
@@ -65,7 +70,7 @@ interface AppDataContextType {
   updateProject: (id: number, project: Partial<Project>) => void;
   deleteProject: (id: number) => void;
   createAssignment: (assignment: Omit<Assignment, 'id' | 'status'>) => void;
-  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, ToolConditionMap>) => void;
+  checkInAssignment: (id: number, checkinDate?: string, checkinNotes?: string, toolConditions?: Record<number, ToolConditionMap>, return_guide?: string) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -300,7 +305,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     id: number,
     checkinDate?: string,
     checkinNotes?: string,
-    toolConditions?: Record<number, ToolConditionMap>
+    toolConditions?: Record<number, ToolConditionMap>,
+    return_guide?: string
   ) => {
     try {
       // If caller provided a full ISO datetime (includes 'T'), use it as-is.
@@ -320,7 +326,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const updatedAssignment = await apiClient.checkinAssignment(id, {
         checkinDate: checkinDateTime,
         checkinNotes,
-        toolConditions
+        toolConditions,
+        return_guide,
       });
 
       const newAssignments = assignments.map(assignment =>

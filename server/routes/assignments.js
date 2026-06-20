@@ -16,6 +16,7 @@ router.get('/', async (req, res) => {
         a.status,
         a.checkinNotes,
         a.toolConditions,
+        a.return_guide,
         w.id as workerId,
         w.name as workerName,
         w.employeeId as workerEmployeeId,
@@ -63,6 +64,7 @@ router.get('/', async (req, res) => {
           checkinDate: assignment.checkinDate,
           status: assignment.status,
           checkinNotes: assignment.checkinNotes,
+          return_guide: assignment.return_guide || null,
           toolConditions: assignment.toolConditions ? JSON.parse(assignment.toolConditions) : {},
           worker: {
             id: assignment.workerId,
@@ -197,6 +199,7 @@ router.post('/', async (req, res) => {
       checkinDate: assignment.checkinDate,
       status: assignment.status,
       checkinNotes: assignment.checkinNotes,
+      return_guide: assignment.return_guide || null,
       toolConditions: assignment.toolConditions ? JSON.parse(assignment.toolConditions) : {},
       worker: {
         id: assignment.workerId,
@@ -220,7 +223,7 @@ router.post('/', async (req, res) => {
 // PUT /api/assignments/:id/checkin - Check in assignment
 router.put('/:id/checkin', async (req, res) => {
   try {
-    const { checkinDate, checkinNotes, toolConditions } = req.body;
+    const { checkinDate, checkinNotes, toolConditions, return_guide } = req.body;
     const finalCheckinDate = checkinDate || new Date().toISOString();
     const assignmentId = req.params.id;
 
@@ -256,9 +259,9 @@ router.put('/:id/checkin', async (req, res) => {
       // Update assignment
       await runQuery(`
         UPDATE assignments
-        SET checkinDate = ?, status = 'completed', checkinNotes = ?, toolConditions = ?
+        SET checkinDate = ?, status = 'completed', checkinNotes = ?, toolConditions = ?, return_guide = ?
         WHERE id = ?
-      `, [finalCheckinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), assignmentId]);
+      `, [finalCheckinDate, checkinNotes || null, JSON.stringify(toolConditions || {}), return_guide || null, assignmentId]);
 
       // Update tool statuses based on conditions
       // Restore quantities for tools assigned to this assignment
@@ -352,6 +355,7 @@ router.put('/:id/checkin', async (req, res) => {
         a.status,
         a.checkinNotes,
         a.toolConditions,
+        a.return_guide,
         w.id as workerId,
         w.name as workerName,
         w.employeeId as workerEmployeeId,
@@ -398,6 +402,7 @@ router.put('/:id/checkin', async (req, res) => {
       checkinDate: assignment.checkinDate,
       status: assignment.status,
       checkinNotes: assignment.checkinNotes,
+      return_guide: assignment.return_guide || null,
       toolConditions: assignment.toolConditions ? JSON.parse(assignment.toolConditions) : {},
       worker: {
         id: assignment.workerId,

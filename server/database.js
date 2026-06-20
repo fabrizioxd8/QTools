@@ -34,6 +34,9 @@ export const initializeDatabase = () => {
       lostQuantity INTEGER DEFAULT 0,
       image TEXT,
       customAttributes TEXT,
+      calibration_company TEXT,
+      last_calibration_date TEXT,
+      calibration_frequency_months INTEGER DEFAULT 12,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -71,6 +74,8 @@ export const initializeDatabase = () => {
       status TEXT DEFAULT 'active',
       checkinNotes TEXT,
       toolConditions TEXT,
+      guiaNumber TEXT,
+      return_guide TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (workerId) REFERENCES workers (id),
@@ -127,6 +132,16 @@ const runMigrations = () => {
         else console.log('✅ guiaNumber column added successfully');
       });
     }
+
+    // Ensure return_guide column exists on assignments
+    const hasReturnGuide = columns.some(col => col.name === 'return_guide');
+    if (!hasReturnGuide) {
+      console.log('🔄 Adding return_guide column to assignments table...');
+      db.run("ALTER TABLE assignments ADD COLUMN return_guide TEXT", (err) => {
+        if (err) console.error('Error adding return_guide column:', err);
+        else console.log('✅ return_guide column added successfully');
+      });
+    }
   });
   
   // Ensure tools table has certificateNumber and quantity columns
@@ -141,6 +156,9 @@ const runMigrations = () => {
     const hasQuantity = columns.some(col => col.name === 'quantity');
     const hasDamagedQuantity = columns.some(col => col.name === 'damagedQuantity');
     const hasLostQuantity = columns.some(col => col.name === 'lostQuantity');
+    const hasCalibrationCompany = columns.some(col => col.name === 'calibration_company');
+    const hasLastCalibrationDate = columns.some(col => col.name === 'last_calibration_date');
+    const hasCalibrationFrequency = columns.some(col => col.name === 'calibration_frequency_months');
 
     if (!hasCertificate) {
       console.log('\u2699\ufe0f Adding certificateNumber column to tools table...');
@@ -171,6 +189,30 @@ const runMigrations = () => {
       db.run("ALTER TABLE tools ADD COLUMN lostQuantity INTEGER DEFAULT 0", (err) => {
         if (err) console.error('Error adding lostQuantity column:', err);
         else console.log('\u2705 lostQuantity column added successfully');
+      });
+    }
+
+    if (!hasCalibrationCompany) {
+      console.log('\u2699\ufe0f Adding calibration_company column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN calibration_company TEXT", (err) => {
+        if (err) console.error('Error adding calibration_company column:', err);
+        else console.log('\u2705 calibration_company column added successfully');
+      });
+    }
+
+    if (!hasLastCalibrationDate) {
+      console.log('\u2699\ufe0f Adding last_calibration_date column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN last_calibration_date TEXT", (err) => {
+        if (err) console.error('Error adding last_calibration_date column:', err);
+        else console.log('\u2705 last_calibration_date column added successfully');
+      });
+    }
+
+    if (!hasCalibrationFrequency) {
+      console.log('\u2699\ufe0f Adding calibration_frequency_months column to tools table...');
+      db.run("ALTER TABLE tools ADD COLUMN calibration_frequency_months INTEGER DEFAULT 12", (err) => {
+        if (err) console.error('Error adding calibration_frequency_months column:', err);
+        else console.log('\u2705 calibration_frequency_months column added successfully');
       });
     }
   });

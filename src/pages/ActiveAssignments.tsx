@@ -26,6 +26,7 @@ export default function ActiveAssignments() {
   const [toolConditions, setToolConditions] = useState<Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>>>({});
   const [editingCompletedAssignment, setEditingCompletedAssignment] = useState<Assignment | null>(null);
   const [checkinNotes, setCheckinNotes] = useState('');
+  const [returnGuide, setReturnGuide] = useState('');
   // Check-in date (YYYY-MM-DD) defaulting to today
   const [checkinDate, setCheckinDate] = useState<string>(() => {
     const d = new Date();
@@ -84,6 +85,7 @@ export default function ActiveAssignments() {
     });
     setToolConditions(initialConditions);
     setCheckinNotes('');
+    setReturnGuide(assignment.guiaNumber || '');
     // Reset check-in date to today when opening dialog
     const d = new Date();
     const year = d.getFullYear();
@@ -126,10 +128,11 @@ export default function ActiveAssignments() {
           checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, second ?? 0).toISOString();
         }
 
-        await checkInAssignment(checkInDialog.id, checkinDateTime, checkinNotes, toolConditions);
+        await checkInAssignment(checkInDialog.id, checkinDateTime, checkinNotes, toolConditions, returnGuide.trim() || undefined);
         toast.success('Tools checked in successfully!');
         setCheckInDialog(null);
         setCheckinNotes('');
+        setReturnGuide('');
         setToolConditions({});
       } catch (error) {
         toast.error('Failed to check in tools. Please try again.');
@@ -158,10 +161,11 @@ export default function ActiveAssignments() {
           checkinDateTime = new Date(year, month - 1, day, hour ?? 0, minute ?? 0, second ?? 0).toISOString();
         }
 
-        await checkInAssignment(editingCompletedAssignment.id, checkinDateTime, checkinNotes, toolConditions);
+        await checkInAssignment(editingCompletedAssignment.id, checkinDateTime, checkinNotes, toolConditions, returnGuide.trim() || undefined);
         toast.success('Check-in updated successfully!');
         setEditingCompletedAssignment(null);
         setCheckinNotes('');
+        setReturnGuide('');
         setToolConditions({});
       } catch (error) {
         toast.error('Failed to update check-in. Please try again.');
@@ -434,6 +438,7 @@ export default function ActiveAssignments() {
                             });
                             setToolConditions(normalized);
                             setCheckinNotes(assignment.checkinNotes || '');
+                            setReturnGuide(assignment.return_guide || assignment.guiaNumber || '');
                             if (assignment.checkinDate) {
                               const date = new Date(assignment.checkinDate);
                               const year = date.getFullYear();
@@ -615,6 +620,19 @@ export default function ActiveAssignments() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Guía de Retorno</Label>
+                  <Input
+                    placeholder="Número de guía de retorno"
+                    value={returnGuide}
+                    onChange={(e) => setReturnGuide(e.target.value)}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pre-cargado con la guía de salida. Modifique si es necesario.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Notes (Optional)</Label>
                   <Textarea
                     placeholder="Add any additional notes about this check-in..."
@@ -747,6 +765,19 @@ export default function ActiveAssignments() {
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Guía de Retorno</Label>
+                  <Input
+                    placeholder="Número de guía de retorno"
+                    value={returnGuide}
+                    onChange={(e) => setReturnGuide(e.target.value)}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pre-cargado con la guía de salida. Modifique si es necesario.
+                  </p>
                 </div>
 
                 <div className="space-y-2">
