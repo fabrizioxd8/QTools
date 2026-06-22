@@ -2,6 +2,7 @@ import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 interface ImageUploadBoxProps {
   // value can be a URL (string), a File (when user selected a file) or null/empty
@@ -11,6 +12,7 @@ interface ImageUploadBoxProps {
 }
 
 export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxProps) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   // previewUrl is managed via local state below
 
@@ -86,7 +88,7 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
         </div>
       ) : (
         <div className="space-y-3">
-          <div 
+          <div
             role="button"
             tabIndex={0}
             className="flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-border bg-gradient-to-br from-muted/30 to-muted/60 hover:from-muted/50 hover:to-muted/80 transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -100,10 +102,10 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
             }}
           >
             <Upload className="h-12 w-12 text-muted-foreground mb-3" />
-            <span className="text-sm text-muted-foreground font-medium">Upload Tool Image</span>
-            <span className="text-xs text-muted-foreground/70 mt-1">Click to browse or drag & drop</span>
+            <span className="text-sm text-muted-foreground font-medium">{t('tools.uploadToolImage')}</span>
+            <span className="text-xs text-muted-foreground/70 mt-1">{t('tools.clickToBrowseOrDrag')}</span>
           </div>
-          
+
           <label htmlFor="tool-image-upload" className="sr-only">Upload tool image</label>
           <input
             id="tool-image-upload"
@@ -113,7 +115,7 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
             onChange={handleFileSelect}
             className="hidden"
           />
-          
+
           <div className="flex gap-2">
             <Button
               type="button"
@@ -123,19 +125,19 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
               className="flex-1"
             >
               <ImageIcon className="h-4 w-4 mr-2" />
-              Browse Files
+              {t('tools.browseFiles')}
             </Button>
           </div>
-          
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or paste URL</span>
+              <span className="bg-background px-2 text-muted-foreground">{t('tools.orPasteUrl')}</span>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <label htmlFor="imageUrl" className="sr-only">Image URL</label>
             <input
@@ -143,7 +145,7 @@ export function ImageUploadBox({ value, onChange, className }: ImageUploadBoxPro
               type="text"
               value={typeof value === 'string' ? value : ''}
               onChange={(e) => onChange(e.target.value)}
-              placeholder="https://example.com/tool-image.jpg"
+              placeholder={t('tools.imageUrlPlaceholder')}
               className="w-full px-3 py-2.5 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors"
             />
           </div>

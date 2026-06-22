@@ -72,12 +72,30 @@ const statusKeyMap: Record<string, string> = {
   'Cal. Due': 'Cal. Due',
 };
 
+// Map from Spanish/variant attribute keys to canonical English keys for translation
+const attributeKeyNormalization: Record<string, string> = {
+  'Marca': 'Brand',
+  'marca': 'Brand',
+  'Modelo': 'Model',
+  'modelo': 'Model',
+  'N° de Serie': 'Serial Number',
+  'Serie': 'Serial Number',
+  'serie': 'Serial Number',
+  'serial_number': 'Serial Number',
+  'Personalizado': 'Custom',
+  'personalizado': 'Custom',
+};
+
 export default function ToolsManager() {
   const { tools, addTool, updateTool, deleteTool, assignments } = useAppData();
   const { t } = useTranslation();
 
   // Translate a stored attribute key to the current language's label
-  const tAttrKey = (key: string) => t(`tools.attrKeys.${key}`, { defaultValue: key });
+  const tAttrKey = (key: string) => {
+    // Normalize Spanish/variant keys to canonical English keys
+    const normalizedKey = attributeKeyNormalization[key] || key;
+    return t(`tools.attrKeys.${normalizedKey}`, { defaultValue: normalizedKey });
+  };
   const translateCategory = (category: string) =>
     categoryKeyMap[category]
       ? t(`tools.categories.${categoryKeyMap[category]}`, { defaultValue: category })
@@ -1401,7 +1419,7 @@ export default function ToolsManager() {
                         </div>
                       )}
                       <div className="flex-1 grid grid-cols-2 gap-3">
-                        <Input value={key} disabled className="font-medium bg-background" />
+                        <Input value={tAttrKey(key)} disabled className="font-medium bg-background" />
                         <Input value={value} disabled className="bg-background" />
                       </div>
                       {!isReadOnly && (
