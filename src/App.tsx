@@ -6,6 +6,7 @@ import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { AppDataProvider, useAppData } from '@/contexts/AppDataContext';
 import { AppSidebar } from '@/components/AppSidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import Dashboard from '@/pages/Dashboard';
 import ToolsManager from '@/pages/ToolsManager';
 import WorkersProjects from '@/pages/WorkersProjects';
@@ -69,7 +70,8 @@ const AppContent = () => {
                     <span className="sr-only">Toggle sidebar</span>
                   </Button>
                 </div>
-                <div className="pt-0">
+                <div className="flex items-center gap-1 pt-0">
+                  <LanguageToggle />
                   <ThemeToggle />
                 </div>
               </>
@@ -85,7 +87,8 @@ const AppContent = () => {
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle sidebar</span>
                 </Button>
-                <div className="pt-0">
+                <div className="flex items-center gap-1 pt-0">
+                  <LanguageToggle />
                   <ThemeToggle />
                 </div>
               </>

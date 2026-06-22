@@ -29,6 +29,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type ExtendedTool = Tool & Partial<{ certificateNumber: string; quantity: number }>;
 import { toast } from 'sonner';
@@ -46,10 +47,37 @@ import {
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools', 'Cleaning and Maintenance', 'Workstation Equipment'];
 const statuses: (Tool['status'] | 'Missing')[] = ['Available', 'In Use', 'Damaged', 'Lost', 'Missing', 'Cal. Due'];
 
+// These are the canonical English keys stored in the DB — keep as-is
 const standardAttributes = ['Brand', 'Model', 'Serial Number', 'Custom'];
+
+// Map from DB-stored English category value → i18n key suffix
+const categoryKeyMap: Record<string, string> = {
+  'Electrical': 'electrical',
+  'Mechanical': 'mechanical',
+  'Safety': 'safety',
+  'Measurement': 'measurement',
+  'Hand Tools': 'handTools',
+  'Power Tools': 'powerTools',
+  'Cleaning and Maintenance': 'cleaning',
+  'Workstation Equipment': 'workstation',
+};
+
+// Map from DB-stored English status value → i18n key suffix
+const statusKeyMap: Record<string, string> = {
+  'Available': 'Available',
+  'In Use': 'In Use',
+  'Damaged': 'Damaged',
+  'Lost': 'Lost',
+  'Missing': 'Missing',
+  'Cal. Due': 'Cal. Due',
+};
 
 export default function ToolsManager() {
   const { tools, addTool, updateTool, deleteTool, assignments } = useAppData();
+  const { t } = useTranslation();
+
+  // Translate a stored attribute key to the current language's label
+  const tAttrKey = (key: string) => t(`tools.attrKeys.${key}`, { defaultValue: key });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -270,7 +298,7 @@ export default function ToolsManager() {
 
   const handleSubmit = async () => {
     if (!formData.name || !formData.category) {
-      toast.error('Please fill in all required fields');
+      toast.error(t('tools.requiredFields'));
       return;
     }
 
@@ -278,24 +306,24 @@ export default function ToolsManager() {
     const isCustom = newAttrKeyType === 'Custom';
 
     if (newAttrValue.trim() || (isCustom && newAttrKey.trim())) {
-      toast.error('Please add or clear the custom attribute fields before saving');
+      toast.error(t('tools.unsavedAttributeWarning'));
       return;
     }
 
     try {
       if (editingTool) {
         await updateTool(editingTool.id, { ...formData });
-        toast.success('Tool updated successfully');
+        toast.success(t('tools.updateSuccess'));
       } else {
         await addTool({ ...formData });
-        toast.success('Tool added successfully');
+        toast.success(t('tools.addSuccess'));
       }
       setIsDialogOpen(false);
       // Clear custom attribute input fields
       setNewAttrKey('');
       setNewAttrValue('');
     } catch (error) {
-      toast.error('Failed to save tool. Please try again.');
+      toast.error(t('tools.saveFailed'));
       console.error('Error saving tool:', error);
     }
   };
@@ -310,7 +338,7 @@ export default function ToolsManager() {
   const handleDeleteAttempt = (id: number) => {
     // Check if tool is assigned to any active assignment
     if (isToolAssigned(id)) {
-      toast.error('Cannot delete tool that is currently assigned to an active project');
+      toast.error(t('tools.cannotDeleteAssigned'));
       return;
     }
     setDeleteConfirmId(id);
@@ -349,7 +377,7 @@ export default function ToolsManager() {
       <div className="mt-3 mb-2">
         <Badge variant="outline" className={`flex w-fit items-center gap-1.5 ${style}`}>
           <Icon className="h-3 w-3" />
-          <span>Cal. Due: {dueDate.toLocaleDateString()}</span>
+          <span>{t('tools.calDueLabel')}: {dueDate.toLocaleDateString()}</span>
         </Badge>
       </div>
     );
@@ -358,10 +386,10 @@ export default function ToolsManager() {
   const handleDelete = async (id: number) => {
     try {
       await deleteTool(id);
-      toast.success('Tool deleted successfully');
+      toast.success(t('tools.deleteSuccess'));
       setDeleteConfirmId(null);
     } catch (error) {
-      toast.error('Failed to delete tool. Please try again.');
+      toast.error(t('tools.deleteFailed'));
       console.error('Error deleting tool:', error);
     }
   };
@@ -713,10 +741,10 @@ export default function ToolsManager() {
       const dateString = new Date().toISOString().split('T')[0];
       saveAs(dataBlob, `Inventario_${dateString}.xlsx`);
 
-      toast.success('Inventario exportado correctamente');
+      toast.success(t('tools.exportSuccess'));
     } catch (error) {
       console.error('Export failed:', error);
-      toast.error('Failed to export inventory');
+      toast.error(t('tools.exportFailed'));
     }
   };
 
@@ -739,17 +767,17 @@ export default function ToolsManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tools Manager</h1>
-          <p className="text-muted-foreground">Manage your tool inventory</p>
+          <h1 className="text-3xl font-bold">{t('tools.title')}</h1>
+          <p className="text-muted-foreground">{t('tools.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportExcel}>
             <Download className="mr-2 h-4 w-4" />
-            Export to Excel
+            {t('tools.exportExcel')}
           </Button>
           <Button onClick={() => openDialog()} disabled={isReadOnly}>
             <Plus className="mr-2 h-4 w-4" />
-            Add New Tool
+            {t('tools.addNewTool')}
           </Button>
         </div>
       </div>
@@ -759,42 +787,46 @@ export default function ToolsManager() {
         <CardContent className="pt-6">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>{t('common.category')}</Label>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="All">All Categories</SelectItem>
+                  <SelectItem value="All">{t('tools.allCategories')}</SelectItem>
                   {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    <SelectItem key={cat} value={cat}>
+                      {t(`tools.categories.${categoryKeyMap[cat]}`, { defaultValue: cat })}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label>{t('common.status')}</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="All">All Statuses</SelectItem>
+                  <SelectItem value="All">{t('tools.allStatuses')}</SelectItem>
                   {statuses.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                    <SelectItem key={status} value={status}>
+                      {t(`tools.statusLabels.${status}`, { defaultValue: status })}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Search</Label>
+              <Label>{t('common.search')}</Label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={searchInputRef}
-                  placeholder="Search tools... (Ctrl+F)"
+                  placeholder={t('tools.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-8"
@@ -810,7 +842,7 @@ export default function ToolsManager() {
         <div className="flex items-center gap-4">
           {/* View Toggle */}
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">View:</span>
+            <span className="text-sm font-medium">{t('common.view')}:</span>
             <div className="flex items-center border rounded-lg p-1">
               <Button
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
@@ -819,7 +851,7 @@ export default function ToolsManager() {
                 className="h-8 px-3"
               >
                 <LayoutGrid className="h-4 w-4 mr-1" />
-                Grid
+                {t('common.grid')}
               </Button>
               <Button
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
@@ -828,14 +860,14 @@ export default function ToolsManager() {
                 className="h-8 px-3"
               >
                 <List className="h-4 w-4 mr-1" />
-                List
+                {t('common.list')}
               </Button>
             </div>
           </div>
 
           {/* Sort Controls */}
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Sort:</span>
+            <span className="text-sm font-medium">{t('common.sort')}:</span>
             <div className="flex items-center gap-1">
               {(() => {
                 const Icon = getSortIcon('name');
@@ -847,7 +879,7 @@ export default function ToolsManager() {
                     className="h-8 px-3"
                   >
                     <Icon className="h-4 w-4 mr-1" />
-                    Name
+                    {t('common.name')}
                   </Button>
                 );
               })()}
@@ -857,7 +889,7 @@ export default function ToolsManager() {
 
         {viewMode === 'grid' && (
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Columns:</span>
+            <span className="text-sm font-medium">{t('common.columns')}:</span>
             <div className="flex items-center border rounded-lg p-1">
               {[2, 3, 4].map((cols) => (
                 <Button
@@ -879,7 +911,7 @@ export default function ToolsManager() {
       {filteredTools.length === 0 ? (
         <Card>
           <CardContent className="py-12">
-            <p className="text-center text-muted-foreground">No tools found</p>
+            <p className="text-center text-muted-foreground">{t('tools.noToolsFound')}</p>
           </CardContent>
         </Card>
       ) : viewMode === 'grid' ? (
@@ -942,25 +974,25 @@ export default function ToolsManager() {
                   {(() => {
                     const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
                     let displayQty = extTool.quantity;
-                    let prefix = "Qty";
+                    let prefix = t('common.quantity');
 
                     if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
                       displayQty = extTool.damagedQuantity;
-                      prefix = "Qty";
+                      prefix = t('common.quantity');
                     } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                       displayQty = extTool.lostQuantity;
-                      prefix = "Qty";
+                      prefix = t('common.quantity');
                     } else if (statusFilter === 'In Use') {
                       displayQty = extTool.inUseQuantity || 0;
-                      prefix = "Qty";
+                      prefix = t('common.quantity');
                     } else if (statusFilter === 'Available') {
                       displayQty = extTool.availableQuantity || 0;
-                      prefix = "Qty";
+                      prefix = t('common.quantity');
                     } else if (statusFilter === 'Missing') {
                       displayQty = extTool.missingQuantity || 0;
-                      prefix = "Qty";
+                      prefix = t('common.quantity');
                     } else if (statusFilter === 'All') {
-                      prefix = "Total";
+                      prefix = t('common.total');
                     }
 
                     // Always show if filtering by Damaged, Lost, In Use, Missing, or Available and there is quantity
@@ -980,7 +1012,7 @@ export default function ToolsManager() {
                     <div className="space-y-1 mb-4">
                       {Object.entries(tool.customAttributes).map(([key, value]) => (
                         <p key={key} className="text-sm text-muted-foreground">
-                          <span className="font-medium">{key}:</span> {value}
+                          <span className="font-medium">{tAttrKey(key)}:</span> {value}
                         </p>
                       ))}
                     </div>
@@ -1070,25 +1102,25 @@ export default function ToolsManager() {
                           {(() => {
                             const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
                             let displayQty = extTool.quantity;
-                            let prefix = "Qty";
+                            let prefix = t('common.quantity');
 
                             if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
                               displayQty = extTool.damagedQuantity;
-                              prefix = "Qty";
+                              prefix = t('common.quantity');
                             } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
                               displayQty = extTool.lostQuantity;
-                              prefix = "Qty";
+                              prefix = t('common.quantity');
                             } else if (statusFilter === 'In Use') {
                               displayQty = extTool.inUseQuantity || 0;
-                              prefix = "Qty";
+                              prefix = t('common.quantity');
                             } else if (statusFilter === 'Available') {
                               displayQty = extTool.availableQuantity || 0;
-                              prefix = "Qty";
+                              prefix = t('common.quantity');
                             } else if (statusFilter === 'Missing') {
                               displayQty = extTool.missingQuantity || 0;
-                              prefix = "Qty";
+                              prefix = t('common.quantity');
                             } else if (statusFilter === 'All') {
-                              prefix = "Total";
+                              prefix = t('common.total');
                             }
 
                             // Always show if filtering by Damaged, Lost, In Use, Missing, or Available and there is quantity
@@ -1107,7 +1139,7 @@ export default function ToolsManager() {
                       <div className="flex gap-2 ml-4">
                         <Button variant="outline" size="sm" onClick={() => openDialog(tool)}>
                           <Pencil className="h-4 w-4 mr-1" />
-                          Edit
+                          {t('common.edit')}
                         </Button>
                         <Button
                           variant="destructive"
@@ -1124,7 +1156,7 @@ export default function ToolsManager() {
                       <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
                         {Object.entries(tool.customAttributes).map(([key, value]) => (
                           <span key={key}>
-                            <span className="font-medium">{key}:</span> {value}
+                            <span className="font-medium">{tAttrKey(key)}:</span> {value}
                           </span>
                         ))}
                       </div>
@@ -1148,9 +1180,9 @@ export default function ToolsManager() {
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="pb-6">
-            <DialogTitle className="text-2xl">{editingTool ? 'Edit Tool' : 'Add New Tool'}</DialogTitle>
+            <DialogTitle className="text-2xl">{editingTool ? t('tools.editTool') : t('tools.addTool')}</DialogTitle>
             <DialogDescription className="text-base">
-              {editingTool ? 'Update tool information and settings' : 'Add a new tool to your inventory with all necessary details'}
+              {editingTool ? t('tools.editToolDesc') : t('tools.addToolDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1160,25 +1192,27 @@ export default function ToolsManager() {
               <div className="grid gap-6">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Tool Name *</Label>
+                    <Label className="text-sm font-semibold">{t('tools.toolName')}</Label>
                     <Input
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Digital Multimeter"
+                      placeholder={t('tools.toolNamePlaceholder')}
                       disabled={isReadOnly}
                       className="h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Category *</Label>
+                    <Label className="text-sm font-semibold">{t('tools.categoryRequired')}</Label>
                     <Select disabled={isReadOnly} value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                       <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Select category" />
+                        <SelectValue placeholder={t('tools.selectCategory')} />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          <SelectItem key={cat} value={cat}>
+                            {t(`tools.categories.${categoryKeyMap[cat]}`, { defaultValue: cat })}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1187,21 +1221,23 @@ export default function ToolsManager() {
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Status</Label>
+                    <Label className="text-sm font-semibold">{t('common.status')}</Label>
                     <Select disabled={isReadOnly} value={formData.status} onValueChange={(value: Tool['status']) => setFormData({ ...formData, status: value })}>
                       <SelectTrigger className="h-11">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {statuses.map(status => (
-                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                          <SelectItem key={status} value={status}>
+                            {t(`tools.statusLabels.${status}`, { defaultValue: status })}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Quantity</Label>
+                    <Label className="text-sm font-semibold">{t('common.quantity')}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -1211,7 +1247,7 @@ export default function ToolsManager() {
                       className="h-11 w-full max-w-xs"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Total available quantity in inventory
+                      {t('tools.quantityHint')}
                     </p>
                   </div>
                 </div>
@@ -1220,29 +1256,29 @@ export default function ToolsManager() {
                   <div className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold">Empresa Certificadora</Label>
+                        <Label className="text-sm font-semibold">{t('tools.certifyingCompany')}</Label>
                         <Input
                           value={formData.calibration_company}
                           onChange={(e) => setFormData({ ...formData, calibration_company: e.target.value })}
                           disabled={isReadOnly}
-                          placeholder="Ej. Bureau Veritas"
+                          placeholder={t('tools.certifyingCompanyPlaceholder')}
                           className="h-11"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold">Certificate N°</Label>
+                        <Label className="text-sm font-semibold">{t('tools.certificateNumber')}</Label>
                         <Input
                           value={formData.certificateNumber}
                           onChange={(e) => setFormData({ ...formData, certificateNumber: e.target.value })}
                           disabled={isReadOnly}
-                          placeholder="Número de certificado"
+                          placeholder={t('tools.certificateNumberPlaceholder')}
                           className="h-11"
                         />
                       </div>
                     </div>
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold">Última Calibración</Label>
+                        <Label className="text-sm font-semibold">{t('tools.lastCalibration')}</Label>
                         <Input
                           type="date"
                           value={formData.last_calibration_date}
@@ -1264,7 +1300,7 @@ export default function ToolsManager() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-sm font-semibold">Frecuencia (Meses)</Label>
+                        <Label className="text-sm font-semibold">{t('tools.frequencyMonths')}</Label>
                         <Input
                           type="number"
                           min={1}
@@ -1290,7 +1326,7 @@ export default function ToolsManager() {
                     {formData.calibrationDue && (
                       <div className="p-3 bg-muted/50 rounded-lg">
                         <p className="text-sm text-muted-foreground">
-                          <span className="font-semibold">Próxima Calibración (calculada):</span>{' '}
+                          <span className="font-semibold">{t('tools.nextCalibration')}:</span>{' '}
                           {new Date(`${formData.calibrationDue}T00:00:00`).toLocaleDateString('es-PE', { year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
                       </div>
@@ -1311,10 +1347,10 @@ export default function ToolsManager() {
                   />
                   <div>
                     <Label htmlFor="calibrable" className="cursor-pointer font-semibold">
-                      Requires Calibration
+                      {t('tools.requiresCalibration')}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Check if this tool needs regular calibration
+                      {t('tools.requiresCalibrationHint')}
                     </p>
                   </div>
                 </div>
@@ -1323,8 +1359,8 @@ export default function ToolsManager() {
               {/* Custom Attributes Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm font-semibold">Custom Attributes</Label>
-                  <Badge variant="outline" className="text-xs">Optional</Badge>
+                  <Label className="text-sm font-semibold">{t('tools.customAttributes')}</Label>
+                  <Badge variant="outline" className="text-xs">{t('common.optional')}</Badge>
                 </div>
 
                 <div className="space-y-3">
@@ -1365,17 +1401,19 @@ export default function ToolsManager() {
                       <div className="flex gap-3">
                         <Select value={newAttrKeyType} onValueChange={(value) => setNewAttrKeyType(value)}>
                           <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Attribute type" />
+                            <SelectValue placeholder={t('tools.attributeType')} />
                           </SelectTrigger>
                           <SelectContent>
                             {standardAttributes.map(attr => (
-                              <SelectItem key={attr} value={attr}>{attr}</SelectItem>
+                              <SelectItem key={attr} value={attr}>
+                                {t(`tools.attrKeys.${attr}`, { defaultValue: attr })}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                         {newAttrKeyType === 'Custom' && (
                           <Input
-                            placeholder="Custom Name"
+                            placeholder={t('tools.customName')}
                             value={newAttrKey}
                             onChange={(e) => setNewAttrKey(e.target.value)}
                             className="flex-1"
@@ -1384,7 +1422,7 @@ export default function ToolsManager() {
                       </div>
                       <div className="flex gap-3">
                         <Input
-                          placeholder="Value (e.g., Fluke)"
+                          placeholder={t('tools.attributeValue')}
                           value={newAttrValue}
                           onChange={(e) => setNewAttrValue(e.target.value)}
                           className="flex-1"
@@ -1408,9 +1446,9 @@ export default function ToolsManager() {
             {/* Right Column - Image Upload */}
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Tool Image</Label>
+                <Label className="text-sm font-semibold">{t('tools.toolImage')}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Add a photo to help identify this tool
+                  {t('tools.toolImageHint')}
                 </p>
               </div>
               <div className={`sticky top-4 ${isReadOnly ? 'pointer-events-none opacity-60' : ''}`}>
@@ -1425,15 +1463,15 @@ export default function ToolsManager() {
           <DialogFooter className="pt-6 border-t">
             {isReadOnly ? (
               <Button variant="outline" onClick={closeDialog} className="px-6">
-                Close
+                {t('common.close')}
               </Button>
             ) : (
               <>
                 <Button variant="outline" onClick={closeDialog} className="px-6">
-                  Cancel
+                  {t('common.cancel')}
                 </Button>
                 <Button onClick={handleSubmit} className="px-6">
-                  {editingTool ? 'Update Tool' : 'Add Tool'}
+                  {editingTool ? t('tools.updateTool') : t('tools.addToolBtn')}
                 </Button>
               </>
             )}
@@ -1445,15 +1483,15 @@ export default function ToolsManager() {
       <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>{t('tools.deleteToolTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the tool from your inventory.
+              {t('tools.deleteToolDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}>
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1463,15 +1501,15 @@ export default function ToolsManager() {
       <AlertDialog open={showUnsavedWarning} onOpenChange={setShowUnsavedWarning}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Custom Attributes</AlertDialogTitle>
+            <AlertDialogTitle>{t('tools.unsavedWarningTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved custom attributes. Are you sure you want to close without adding them?
+              {t('tools.unsavedWarningDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogCancel>{t('tools.goBack')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmCloseDialog}>
-              Close Without Saving
+              {t('tools.discardAndClose')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

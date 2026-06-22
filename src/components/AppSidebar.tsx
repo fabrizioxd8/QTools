@@ -11,33 +11,31 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTranslation } from 'react-i18next';
 
 interface AppSidebarProps {
   currentPage: string;
   onNavigate: (page: string) => void;
 }
 
-const menuItems = [
-  { title: 'Dashboard', icon: LayoutDashboard, page: 'dashboard' },
-  { title: 'Tools Manager', icon: Wrench, page: 'tools' },
-  { title: 'Workers & Projects', icon: Users, page: 'workers-projects' },
-  { title: 'Checkout', icon: ShoppingCart, page: 'checkout' },
-  { title: 'Active Assignments', icon: ClipboardList, page: 'assignments' },
-  { title: 'Reports', icon: FileText, page: 'reports' },
-];
-
 export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
   const { state, setOpen, setOpenMobile, isMobile } = useSidebar();
+  const { t } = useTranslation();
+
+  const menuItems = [
+    { title: t('nav.dashboard'), icon: LayoutDashboard, page: 'dashboard' },
+    { title: t('nav.tools'), icon: Wrench, page: 'tools' },
+    { title: t('nav.workersProjects'), icon: Users, page: 'workers-projects' },
+    { title: t('nav.checkout'), icon: ShoppingCart, page: 'checkout' },
+    { title: t('nav.assignments'), icon: ClipboardList, page: 'assignments' },
+    { title: t('nav.reports'), icon: FileText, page: 'reports' },
+  ];
 
   const handleNavigation = (page: string) => {
     onNavigate(page);
-
-    // Auto-collapse behavior based on screen size
     if (isMobile) {
-      // On mobile: close the overlay sidebar
       setOpenMobile(false);
     } else {
-      // On desktop: collapse to icon-only if expanded
       if (state === 'expanded') {
         setOpen(false);
       }
@@ -53,8 +51,6 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
       <SidebarContent>
         {/* Mobile Close Button */}
         {isMobile && (
-          // Position the close button absolutely so it doesn't affect layout flow
-          // (prevents the sidebar content from being pushed down on small screens)
           <div className="absolute top-2 right-2 z-50 lg:hidden">
             <Button
               variant="ghost"
@@ -69,7 +65,7 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
         )}
 
         <SidebarGroup>
-          {/* Logo Section - Always show logo icon, hide text when collapsed */}
+          {/* Logo Section */}
           <div className="flex items-start gap-2 px-3 pt-2 pb-3 border-b border-border/50 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center">
             <img src="/logo.png" alt="QTools Logo" className="h-8 w-8 flex-shrink-0 min-w-[2rem]" />
             <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden transition-opacity duration-200">
@@ -81,7 +77,6 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.page}>
-                  {/* Desktop: Show tooltip when collapsed */}
                   {!isMobile && state === 'collapsed' ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -99,7 +94,6 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
                       </TooltipContent>
                     </Tooltip>
                   ) : (
-                    /* Mobile or Desktop Expanded: Show full button */
                     <SidebarMenuButton
                       onClick={() => handleNavigation(item.page)}
                       isActive={currentPage === item.page}
@@ -116,8 +110,6 @@ export function AppSidebar({ currentPage, onNavigate }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      {/* Remove SidebarFooter - theme toggle moved to top bar */}
     </Sidebar>
   );
 }

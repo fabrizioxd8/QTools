@@ -34,9 +34,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useTranslation } from 'react-i18next';
 
 export default function WorkersProjects() {
   const { workers, projects, assignments, addWorker, updateWorker, deleteWorker, addProject, updateProject, deleteProject } = useAppData();
+  const { t } = useTranslation();
+
   const [expandedWorkerIds, setExpandedWorkerIds] = useState<number[]>([]);
   const [expandedProjectIds, setExpandedProjectIds] = useState<number[]>([]);
   const toggleWorkerExpand = (id: number) => {
@@ -46,7 +49,6 @@ export default function WorkersProjects() {
     setExpandedProjectIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   };
 
-  // Search input refs
   const workerSearchInputRef = useRef<HTMLInputElement>(null);
   const projectSearchInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<'workers' | 'projects'>('workers');
@@ -57,7 +59,6 @@ export default function WorkersProjects() {
   const [workerFormData, setWorkerFormData] = useState({ name: '', employeeId: '' });
   const [workerSearch, setWorkerSearch] = useState('');
   const [deleteWorkerConfirm, setDeleteWorkerConfirm] = useState<number | null>(null);
-
 
   // Project state
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
@@ -72,13 +73,8 @@ export default function WorkersProjects() {
 
   const handleWorkerSort = (field: 'name') => {
     if (workerSortField === field) {
-      if (workerSortDirection === 'asc') {
-        setWorkerSortDirection('desc');
-      } else {
-        // Reset to unsorted
-        setWorkerSortField(null);
-        setWorkerSortDirection('asc');
-      }
+      if (workerSortDirection === 'asc') setWorkerSortDirection('desc');
+      else { setWorkerSortField(null); setWorkerSortDirection('asc'); }
     } else {
       setWorkerSortField(field);
       setWorkerSortDirection('asc');
@@ -96,13 +92,8 @@ export default function WorkersProjects() {
 
   const handleProjectSort = (field: 'name') => {
     if (projectSortField === field) {
-      if (projectSortDirection === 'asc') {
-        setProjectSortDirection('desc');
-      } else {
-        // Reset to unsorted
-        setProjectSortField(null);
-        setProjectSortDirection('asc');
-      }
+      if (projectSortDirection === 'asc') setProjectSortDirection('desc');
+      else { setProjectSortField(null); setProjectSortDirection('asc'); }
     } else {
       setProjectSortField(field);
       setProjectSortDirection('asc');
@@ -128,22 +119,20 @@ export default function WorkersProjects() {
 
   const handleWorkerSubmit = async () => {
     if (!workerFormData.name || !workerFormData.employeeId) {
-      toast.error('Please fill in all fields');
+      toast.error(t('workersProjects.requiredFields'));
       return;
     }
-
     try {
       if (editingWorker) {
         await updateWorker(editingWorker.id, workerFormData);
-        toast.success('Worker updated successfully');
+        toast.success(t('workersProjects.workerUpdatedSuccess'));
       } else {
         await addWorker(workerFormData);
-        toast.success('Worker added successfully');
+        toast.success(t('workersProjects.workerAddedSuccess'));
       }
-
       setIsWorkerDialogOpen(false);
     } catch (error) {
-      toast.error('Failed to save worker. Please try again.');
+      toast.error(t('workersProjects.workerSaveFailed'));
       console.error('Error saving worker:', error);
     }
   };
@@ -151,10 +140,10 @@ export default function WorkersProjects() {
   const handleWorkerDelete = async (id: number) => {
     try {
       await deleteWorker(id);
-      toast.success('Worker deleted successfully');
+      toast.success(t('workersProjects.workerDeletedSuccess'));
       setDeleteWorkerConfirm(null);
     } catch (error) {
-      toast.error('Failed to delete worker. Please try again.');
+      toast.error(t('workersProjects.workerDeleteFailed'));
       console.error('Error deleting worker:', error);
     }
   };
@@ -173,22 +162,20 @@ export default function WorkersProjects() {
 
   const handleProjectSubmit = async () => {
     if (!projectFormData.name) {
-      toast.error('Please enter a project name');
+      toast.error(t('workersProjects.requiredProjectName'));
       return;
     }
-
     try {
       if (editingProject) {
         await updateProject(editingProject.id, projectFormData);
-        toast.success('Project updated successfully');
+        toast.success(t('workersProjects.projectUpdatedSuccess'));
       } else {
         await addProject(projectFormData);
-        toast.success('Project added successfully');
+        toast.success(t('workersProjects.projectAddedSuccess'));
       }
-
       setIsProjectDialogOpen(false);
     } catch (error) {
-      toast.error('Failed to save project. Please try again.');
+      toast.error(t('workersProjects.projectSaveFailed'));
       console.error('Error saving project:', error);
     }
   };
@@ -196,10 +183,10 @@ export default function WorkersProjects() {
   const handleProjectDelete = async (id: number) => {
     try {
       await deleteProject(id);
-      toast.success('Project deleted successfully');
+      toast.success(t('workersProjects.projectDeletedSuccess'));
       setDeleteProjectConfirm(null);
     } catch (error) {
-      toast.error('Failed to delete project. Please try again.');
+      toast.error(t('workersProjects.projectDeleteFailed'));
       console.error('Error deleting project:', error);
     }
   };
@@ -207,28 +194,21 @@ export default function WorkersProjects() {
   const workerStats = useMemo(() => {
     const stats = new Map<number, { projectCount: number; toolCount: number }>();
     const projectSet = new Map<number, Set<number>>();
-
     assignments.forEach(assignment => {
       if (assignment.status === 'active') {
         const workerId = assignment.worker.id;
-
-        if (!projectSet.has(workerId)) {
-          projectSet.set(workerId, new Set());
-        }
+        if (!projectSet.has(workerId)) projectSet.set(workerId, new Set());
         projectSet.get(workerId)!.add(assignment.project.id);
-
         const currentStats = stats.get(workerId) || { projectCount: 0, toolCount: 0 };
         currentStats.toolCount += assignment.tools.length;
         stats.set(workerId, currentStats);
       }
     });
-
     projectSet.forEach((projects, workerId) => {
       const currentStats = stats.get(workerId) || { projectCount: 0, toolCount: 0 };
       currentStats.projectCount = projects.size;
       stats.set(workerId, currentStats);
     });
-
     return stats;
   }, [assignments]);
 
@@ -237,12 +217,10 @@ export default function WorkersProjects() {
       ...w,
       ...(workerStats.get(w.id) || { projectCount: 0, toolCount: 0 })
     }));
-
     if (workerSortField !== null) {
       sortableWorkers.sort((a, b) => {
         const aValue = a[workerSortField];
         const bValue = b[workerSortField];
-
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           const aLower = aValue.toLowerCase();
           const bLower = bValue.toLowerCase();
@@ -252,60 +230,47 @@ export default function WorkersProjects() {
         return 0;
       });
     }
-
     return sortableWorkers.filter(w =>
       matchesSearch(w.name, workerSearch) || matchesSearch(w.employeeId, workerSearch)
     );
   }, [workers, workerSearch, workerSortField, workerSortDirection, workerStats]);
 
-
-
   const filteredProjects = projects
     .filter(p => matchesSearch(p.name, projectSearch))
     .sort((a, b) => {
       if (!projectSortField) return 0;
-
       let aValue = a[projectSortField];
       let bValue = b[projectSortField];
-
       if (typeof aValue === 'string') aValue = aValue.toLowerCase();
       if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-
       if (aValue < bValue) return projectSortDirection === 'asc' ? -1 : 1;
       if (aValue > bValue) return projectSortDirection === 'asc' ? 1 : -1;
       return 0;
     });
 
-  // Handle Ctrl+F to focus search bar based on active tab
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === 'f') {
         event.preventDefault();
-        if (activeTab === 'workers') {
-          workerSearchInputRef.current?.focus();
-        } else {
-          projectSearchInputRef.current?.focus();
-        }
+        if (activeTab === 'workers') workerSearchInputRef.current?.focus();
+        else projectSearchInputRef.current?.focus();
       }
     };
-
     document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [activeTab]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Workers & Projects</h1>
-        <p className="text-muted-foreground">Manage workers and projects</p>
+        <h1 className="text-3xl font-bold">{t('workersProjects.title')}</h1>
+        <p className="text-muted-foreground">{t('workersProjects.subtitle')}</p>
       </div>
 
       <Tabs defaultValue="workers" className="space-y-4" onValueChange={(value) => setActiveTab(value as 'workers' | 'projects')}>
         <TabsList>
-          <TabsTrigger value="workers">Workers</TabsTrigger>
-          <TabsTrigger value="projects">Projects</TabsTrigger>
+          <TabsTrigger value="workers">{t('workersProjects.workers')}</TabsTrigger>
+          <TabsTrigger value="projects">{t('workersProjects.projects')}</TabsTrigger>
         </TabsList>
 
         {/* Workers Tab */}
@@ -313,10 +278,10 @@ export default function WorkersProjects() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Workers</CardTitle>
+                <CardTitle>{t('workersProjects.workers')}</CardTitle>
                 <Button onClick={() => openWorkerDialog()}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Worker
+                  {t('workersProjects.addWorker')}
                 </Button>
               </div>
             </CardHeader>
@@ -326,18 +291,16 @@ export default function WorkersProjects() {
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     ref={workerSearchInputRef}
-                    placeholder="Search workers... (Ctrl+F)"
+                    placeholder={t('workersProjects.searchWorkers')}
                     value={workerSearch}
                     onChange={(e) => setWorkerSearch(e.target.value)}
                     className="pl-8"
                   />
                 </div>
-
-
               </div>
 
               {sortedAndFilteredWorkers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No workers found</p>
+                <p className="text-center text-muted-foreground py-8">{t('workersProjects.noWorkersFound')}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -349,17 +312,14 @@ export default function WorkersProjects() {
                             className="h-auto p-0 font-semibold hover:bg-transparent"
                             onClick={() => handleWorkerSort('name')}
                           >
-                            Name
-                            {(() => {
-                              const Icon = getWorkerSortIcon('name');
-                              return <Icon className="ml-2 h-4 w-4" />;
-                            })()}
+                            {t('common.name')}
+                            {(() => { const Icon = getWorkerSortIcon('name'); return <Icon className="ml-2 h-4 w-4" />; })()}
                           </Button>
                         </TableHead>
-                        <TableHead className="hidden md:table-cell">Employee ID</TableHead>
-                        <TableHead className="hidden md:table-cell">Assigned Projects</TableHead>
-                        <TableHead className="hidden md:table-cell">Assigned Tools</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="hidden md:table-cell">{t('workersProjects.employeeIdLabel')}</TableHead>
+                        <TableHead className="hidden md:table-cell">{t('workersProjects.assignedProjects')}</TableHead>
+                        <TableHead className="hidden md:table-cell">{t('workersProjects.assignedTools')}</TableHead>
+                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -403,31 +363,22 @@ export default function WorkersProjects() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openWorkerDialog(worker)}
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => openWorkerDialog(worker)}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeleteWorkerConfirm(worker.id)}
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => setDeleteWorkerConfirm(worker.id)}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
                             </TableCell>
                           </TableRow>
-                          {/* Expandable details row for small screens */}
                           {expandedWorkerIds.includes(worker.id) && (
                             <TableRow id={`details-${worker.id}`}>
                               <TableCell className="md:hidden" colSpan={5} role="region">
                                 <div className="space-y-2">
-                                  <div className="text-sm"><strong>Employee ID:</strong> {worker.employeeId}</div>
-                                  <div className="text-sm"><strong>Assigned Projects:</strong> {worker.projectCount}</div>
-                                  <div className="text-sm"><strong>Assigned Tools:</strong> {worker.toolCount}</div>
+                                  <div className="text-sm"><strong>{t('workersProjects.employeeIdLabel')}:</strong> {worker.employeeId}</div>
+                                  <div className="text-sm"><strong>{t('workersProjects.assignedProjects')}:</strong> {worker.projectCount}</div>
+                                  <div className="text-sm"><strong>{t('workersProjects.assignedTools')}:</strong> {worker.toolCount}</div>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -447,10 +398,10 @@ export default function WorkersProjects() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Projects</CardTitle>
+                <CardTitle>{t('workersProjects.projects')}</CardTitle>
                 <Button onClick={() => openProjectDialog()}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Project
+                  {t('workersProjects.addProject')}
                 </Button>
               </div>
             </CardHeader>
@@ -460,7 +411,7 @@ export default function WorkersProjects() {
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     ref={projectSearchInputRef}
-                    placeholder="Search projects... (Ctrl+F)"
+                    placeholder={t('workersProjects.searchProjects')}
                     value={projectSearch}
                     onChange={(e) => setProjectSearch(e.target.value)}
                     className="pl-8"
@@ -469,7 +420,7 @@ export default function WorkersProjects() {
               </div>
 
               {filteredProjects.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No projects found</p>
+                <p className="text-center text-muted-foreground py-8">{t('workersProjects.noProjectsFound')}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -481,14 +432,11 @@ export default function WorkersProjects() {
                             className="h-auto p-0 font-semibold hover:bg-transparent"
                             onClick={() => handleProjectSort('name')}
                           >
-                            Project Name
-                            {(() => {
-                              const Icon = getProjectSortIcon('name');
-                              return <Icon className="ml-2 h-4 w-4" />;
-                            })()}
+                            {t('workersProjects.projectNameLabel')}
+                            {(() => { const Icon = getProjectSortIcon('name'); return <Icon className="ml-2 h-4 w-4" />; })()}
                           </Button>
                         </TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -521,18 +469,10 @@ export default function WorkersProjects() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openProjectDialog(project)}
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => openProjectDialog(project)}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeleteProjectConfirm(project.id)}
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => setDeleteProjectConfirm(project.id)}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
@@ -542,8 +482,7 @@ export default function WorkersProjects() {
                             <TableRow id={`p-details-${project.id}`}>
                               <TableCell className="md:hidden" colSpan={2} role="region">
                                 <div className="space-y-2">
-                                  <div className="text-sm"><strong>Project Name:</strong> {project.name}</div>
-                                  {/* add more project details here if needed */}
+                                  <div className="text-sm"><strong>{t('workersProjects.projectNameLabel')}:</strong> {project.name}</div>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -563,36 +502,35 @@ export default function WorkersProjects() {
       <Dialog open={isWorkerDialogOpen} onOpenChange={setIsWorkerDialogOpen}>
         <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>{editingWorker ? 'Edit Worker' : 'Add New Worker'}</DialogTitle>
+            <DialogTitle>
+              {editingWorker ? t('workersProjects.editWorker') : t('workersProjects.addWorkerTitle')}
+            </DialogTitle>
             <DialogDescription>
-              {editingWorker ? 'Update worker information' : 'Add a new worker to your system'}
+              {editingWorker ? t('workersProjects.editWorkerDesc') : t('workersProjects.addWorkerDesc')}
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Worker Name *</Label>
+              <Label>{t('workersProjects.workerName')}</Label>
               <Input
                 value={workerFormData.name}
                 onChange={(e) => setWorkerFormData({ ...workerFormData, name: e.target.value })}
-                placeholder="Enter worker name"
+                placeholder={t('workersProjects.workerNamePlaceholder')}
               />
             </div>
-
             <div className="space-y-2">
-              <Label>Employee ID *</Label>
+              <Label>{t('workersProjects.employeeId')}</Label>
               <Input
                 value={workerFormData.employeeId}
                 onChange={(e) => setWorkerFormData({ ...workerFormData, employeeId: e.target.value })}
-                placeholder="Enter employee ID"
+                placeholder={t('workersProjects.employeeIdPlaceholder')}
               />
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsWorkerDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsWorkerDialogOpen(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleWorkerSubmit}>
-              {editingWorker ? 'Update' : 'Add'} Worker
+              {editingWorker ? t('workersProjects.updateWorker') : t('workersProjects.addWorkerBtn')} {t('workersProjects.workers')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -602,27 +540,27 @@ export default function WorkersProjects() {
       <Dialog open={isProjectDialogOpen} onOpenChange={setIsProjectDialogOpen}>
         <DialogContent onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>{editingProject ? 'Edit Project' : 'Add New Project'}</DialogTitle>
+            <DialogTitle>
+              {editingProject ? t('workersProjects.editProjectTitle') : t('workersProjects.addProjectTitle')}
+            </DialogTitle>
             <DialogDescription>
-              {editingProject ? 'Update project information' : 'Add a new project to your system'}
+              {editingProject ? t('workersProjects.editProjectDesc') : t('workersProjects.addProjectDesc')}
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Project Name *</Label>
+              <Label>{t('workersProjects.projectName')}</Label>
               <Input
                 value={projectFormData.name}
                 onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })}
-                placeholder="Enter project name"
+                placeholder={t('workersProjects.projectNamePlaceholder')}
               />
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleProjectSubmit}>
-              {editingProject ? 'Update' : 'Add'} Project
+              {editingProject ? t('workersProjects.updateProject') : t('workersProjects.addProjectBtn')} {t('workersProjects.projects')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -632,15 +570,13 @@ export default function WorkersProjects() {
       <AlertDialog open={deleteWorkerConfirm !== null} onOpenChange={() => setDeleteWorkerConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this worker from your system.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('workersProjects.deleteWorkerTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('workersProjects.deleteWorkerDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteWorkerConfirm && handleWorkerDelete(deleteWorkerConfirm)}>
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -650,15 +586,13 @@ export default function WorkersProjects() {
       <AlertDialog open={deleteProjectConfirm !== null} onOpenChange={() => setDeleteProjectConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this project from your system.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('workersProjects.deleteProjectTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('workersProjects.deleteProjectDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteProjectConfirm && handleProjectDelete(deleteProjectConfirm)}>
-              Delete
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

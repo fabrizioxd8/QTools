@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useAppData } from '@/contexts/AppDataContext';
 import { Progress } from '@/components/ui/progress';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -12,13 +13,13 @@ interface DashboardProps {
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const { tools, assignments } = useAppData();
+  const { t } = useTranslation();
 
   const totalTools = tools.length;
   const availableTools = tools.filter(t => t.status === 'Available').length;
   const inUseTools = tools.filter(t => t.status === 'In Use').length;
   const activeAssignments = assignments.filter(a => a.status === 'active').length;
 
-  // Calculate calibration alerts
   const today = new Date();
   const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   const calibrationAlerts = tools.filter(tool => {
@@ -27,37 +28,35 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     return dueDate <= thirtyDaysFromNow;
   });
 
-  // Category breakdown
   const categoryBreakdown = tools.reduce((acc, tool) => {
     acc[tool.category] = (acc[tool.category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  // Status breakdown
   const statusBreakdown = tools.reduce((acc, tool) => {
     acc[tool.status] = (acc[tool.status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const quickActions = [
-    { title: 'Add New Tool', icon: Plus, page: 'tools', color: 'bg-primary' },
-    { title: 'Checkout Tools', icon: ShoppingCart, page: 'checkout', color: 'bg-info' },
-    { title: 'View Assignments', icon: ClipboardList, page: 'assignments', color: 'bg-purple-500' },
-    { title: 'View Reports', icon: FileText, page: 'reports', color: 'bg-success' },
+    { titleKey: 'dashboard.addNewTool', icon: Plus, page: 'tools', color: 'bg-primary' },
+    { titleKey: 'dashboard.checkoutTools', icon: ShoppingCart, page: 'checkout', color: 'bg-info' },
+    { titleKey: 'dashboard.viewAssignments', icon: ClipboardList, page: 'assignments', color: 'bg-purple-500' },
+    { titleKey: 'dashboard.viewReports', icon: FileText, page: 'reports', color: 'bg-success' },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your tool room inventory system</p>
+        <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
+        <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Metrics Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tools</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.totalTools')}</CardTitle>
             <Wrench className="h-5 w-5 text-primary" />
           </CardHeader>
           <CardContent>
@@ -67,7 +66,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Available Tools</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.availableTools')}</CardTitle>
             <CheckCircle className="h-5 w-5 text-success" />
           </CardHeader>
           <CardContent>
@@ -77,7 +76,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">In Use</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.inUse')}</CardTitle>
             <Clock className="h-5 w-5 text-info" />
           </CardHeader>
           <CardContent>
@@ -87,7 +86,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
         <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Assignments</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.activeAssignments')}</CardTitle>
             <Users className="h-5 w-5 text-purple-500" />
           </CardHeader>
           <CardContent>
@@ -103,13 +102,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             <CardHeader>
               <div className="flex items-center space-x-2">
                 <AlertTriangle className="h-5 w-5 text-warning" />
-                <CardTitle>Calibration Alerts</CardTitle>
+                <CardTitle>{t('dashboard.calibrationAlerts')}</CardTitle>
               </div>
-              <CardDescription>Tools requiring calibration within 30 days</CardDescription>
+              <CardDescription>{t('dashboard.calibrationAlertsDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               {calibrationAlerts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming calibrations</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.noUpcomingCalibrations')}</p>
               ) : (
                 <div className="space-y-3">
                   {calibrationAlerts.map(tool => {
@@ -134,13 +133,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               }}
                             >
                               <Badge variant={isOverdue ? 'destructive' : 'secondary'}>
-                                {isOverdue ? 'Overdue' : dueDate.toLocaleDateString()}
+                                {isOverdue ? t('dashboard.overdue') : dueDate.toLocaleDateString()}
                               </Badge>
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs text-left">
                             <p className="font-semibold">{tool.name}</p>
-                            <p className="text-xs text-muted-foreground">Due: {dueDate.toLocaleDateString()}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('dashboard.due')}: {dueDate.toLocaleDateString()}
+                            </p>
                             {details.length > 0 && (
                               <div className="mt-1 space-y-1 text-xs text-muted-foreground">
                                 {details.map((detail, index) => (
@@ -148,7 +149,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                 ))}
                               </div>
                             )}
-                            <p className="mt-2 text-xs text-muted-foreground">Click the badge to open Tools with this name prefilled.</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {t('dashboard.clickBadgeHint')}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -163,8 +166,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common tasks and operations</CardDescription>
+            <CardTitle>{t('dashboard.quickActions')}</CardTitle>
+            <CardDescription>{t('dashboard.quickActionsDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
@@ -176,7 +179,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   onClick={() => onNavigate(action.page)}
                 >
                   <action.icon className="h-6 w-6" />
-                  <span className="text-sm text-center">{action.title}</span>
+                  <span className="text-sm text-center">{t(action.titleKey)}</span>
                 </Button>
               ))}
             </div>
@@ -188,7 +191,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {/* Category Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>Tools by Category</CardTitle>
+            <CardTitle>{t('dashboard.toolsByCategory')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -196,7 +199,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 <div key={category} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">{category}</span>
-                    <span className="text-muted-foreground">{count} tools</span>
+                    <span className="text-muted-foreground">
+                      {count} {t('dashboard.tools')}
+                    </span>
                   </div>
                   <Progress value={(count / totalTools) * 100} />
                 </div>
@@ -208,7 +213,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {/* Status Summary */}
         <Card>
           <CardHeader>
-            <CardTitle>Tool Status Summary</CardTitle>
+            <CardTitle>{t('dashboard.toolStatusSummary')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
