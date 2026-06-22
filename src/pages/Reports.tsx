@@ -39,11 +39,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAppData } from '@/contexts/AppDataContext';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 const formatDateInput = (date: Date) => date.toISOString().split('T')[0];
 
 export default function Reports() {
+  const { t } = useTranslation();
   const { tools, assignments } = useAppData();
   const [rangePreset, setRangePreset] = useState<'7' | '30' | '90' | 'custom'>('30');
   const [startDateStr, setStartDateStr] = useState(() => formatDateInput(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000)));
@@ -121,7 +123,7 @@ export default function Reports() {
           serie: attributes.serie,
           quantity,
           extraDetails,
-          statusLabel: quantity > 1 ? `Status: Good (${quantity})` : 'Status: Good',
+          statusLabel: quantity > 1 ? `Status: ${t('assignments.conditionGood')} (${quantity})` : `Status: ${t('assignments.conditionGood')}`,
           conditionPairs: [{ cond: 'good', qty: quantity }],
         });
       });
@@ -172,7 +174,7 @@ export default function Reports() {
     });
 
     return log.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
-  }, [assignments]);
+  }, [assignments, t]);
 
   const filteredActivityLog = useMemo(
     () => activityLog.filter(entry => entry.dateObj >= startDate && entry.dateObj <= endDate),
@@ -266,7 +268,14 @@ export default function Reports() {
     ].join('<br/>');
   };
 
-  const dayLabels = useMemo(() => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], []);
+  const dayLabels = useMemo(() => [
+    t('common.mon', 'Mon'),
+    t('common.tue', 'Tue'),
+    t('common.wed', 'Wed'),
+    t('common.thu', 'Thu'),
+    t('common.fri', 'Fri'),
+    t('common.sat', 'Sat')
+  ], [t]);
   const weekdayIndex = (date: Date) => {
     const dayOfWeek = date.getDay();
     if (dayOfWeek === 0) return -1; // Skip Sunday
@@ -307,7 +316,7 @@ export default function Reports() {
 
     const detailsRows = filteredActivityLog.map(item => ({
       date: new Date(item.date).toLocaleString(),
-      action: item.action === 'Checkout' ? 'Checked Out' : 'Checked In',
+      action: item.action === 'Checkout' ? t('reports.toolsCheckedOut') : t('reports.toolsReturned'),
       worker: item.worker,
       project: item.project,
       toolDetails: formatToolDetails(item),
@@ -386,7 +395,7 @@ export default function Reports() {
             <div class="header">
               <div class="header-copy">
                 <h1>Weekly Tool Movement Report</h1>
-                <p class="subtitle">For the week of ${pdfDateRangeLabel}</p>
+                <p class="subtitle">${t("reports.forTheWeekOf")} ${pdfDateRangeLabel}</p>
               </div>
               <img class="logo" src="${window.location.origin}/brand.png" alt="Company logo" />
             </div>
@@ -397,9 +406,9 @@ export default function Reports() {
                 <thead>
                   <tr>
                     <th>Date and time</th>
-                    <th>Action</th>
-                    <th>Worker</th>
-                    <th>Project</th>
+                    <th>${t("reports.action")}</th>
+                    <th>${t("reports.worker")}</th>
+                    <th>${t("reports.project")}</th>
                     <th>Tool details</th>
                     <th>Quantity</th>
                   </tr>
@@ -560,7 +569,7 @@ export default function Reports() {
         >
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-base">Advanced Filters</CardTitle>
+            <CardTitle className="text-base">{t("reports.advancedFilters")}</CardTitle>
           </div>
           {showFilters ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
         </div>
@@ -570,7 +579,7 @@ export default function Reports() {
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="text-sm font-medium">Report range</p>
+                  <p className="text-sm font-medium">{t("reports.reportRange")}</p>
                   <p className="text-sm text-muted-foreground">{startDate.toLocaleDateString()} – {endDate.toLocaleDateString()}</p>
                 </div>
               </div>
@@ -619,7 +628,7 @@ export default function Reports() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
-            <CardTitle>Total Projects</CardTitle>
+            <CardTitle>{t("reports.totalProjects")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{totalProjects}</div>
@@ -629,7 +638,7 @@ export default function Reports() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Tools Checked Out</CardTitle>
+            <CardTitle>{t("reports.toolsCheckedOut")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-info">{toolsCheckedOut}</div>
@@ -639,7 +648,7 @@ export default function Reports() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Tools Returned</CardTitle>
+            <CardTitle>{t("reports.toolsReturned")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-success">{toolsReturned}</div>
@@ -649,7 +658,7 @@ export default function Reports() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Currently Active</CardTitle>
+            <CardTitle>{t("reports.currentlyActive")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-warning">{currentlyActive}</div>
@@ -662,7 +671,7 @@ export default function Reports() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>Weekly Trend</CardTitle>
+            <CardTitle>{t("reports.weeklyTrend")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -682,7 +691,7 @@ export default function Reports() {
         </Card>
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle>Usage Breakdown</CardTitle>
+            <CardTitle>{t("reports.usageBreakdown")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -705,22 +714,22 @@ export default function Reports() {
       <div className="grid gap-6 lg:grid-cols-5">
         <Card ref={activityLogRef} className="lg:col-span-3 min-w-0">
           <CardHeader>
-            <CardTitle>Weekly Movements</CardTitle>
-            <CardDescription>Tool activity during the selected date range</CardDescription>
+            <CardTitle>{t("reports.weeklyMovements")}</CardTitle>
+            <CardDescription>{t("reports.toolActivityDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             {totalActivities === 0 ? (
-              <p className="text-center text-muted-foreground py-10">No tool movement found for the chosen date range.</p>
+              <p className="text-center text-muted-foreground py-10">{t("reports.noMovement")}</p>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date/Time</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Worker</TableHead>
-                      <TableHead>Project</TableHead>
-                      <TableHead>Tool</TableHead>
+                      <TableHead>{t("reports.dateTime")}</TableHead>
+                      <TableHead>{t("reports.action")}</TableHead>
+                      <TableHead>{t("reports.worker")}</TableHead>
+                      <TableHead>{t("reports.project")}</TableHead>
+                      <TableHead>{t("reports.tool")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -736,7 +745,7 @@ export default function Reports() {
                             }
                           >
                             <span className={`h-1.5 w-1.5 rounded-full ${log.action === 'Checkout' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-                            {log.action}
+                            {log.action === 'Checkout' ? t('nav.checkout') : t('assignments.checkIn')}
                           </Badge>
                         </TableCell>
                         <TableCell>{log.worker}</TableCell>
@@ -765,7 +774,8 @@ export default function Reports() {
                                     colorClass = 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-800/50';
                                     dotClass = 'bg-yellow-500';
                                   }
-                                  const label = `${cond.charAt(0).toUpperCase() + cond.slice(1)}: ${qty}`;
+                                  const localizedCond = t(`assignments.condition${cond.charAt(0).toUpperCase() + cond.slice(1)}`, cond);
+                                  const label = `${localizedCond}: ${qty}`;
                                   return (
                                     <span key={i} className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${colorClass}`}>
                                       <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
@@ -793,16 +803,16 @@ export default function Reports() {
                   disabled={currentPage === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  Previous
+                  {t("common.previous", "Previous")}
                 </Button>
-                <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                <span className="text-sm">{t("reports.page", { current: currentPage, total: totalPages })}</span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                 >
-                  Next
+                  {t("common.next", "Next")}
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
@@ -812,20 +822,20 @@ export default function Reports() {
 
         <Card className="lg:col-span-2 min-w-0">
           <CardHeader>
-            <CardTitle>Tool Inventory Status</CardTitle>
-            <CardDescription>Category breakdown for current stock</CardDescription>
+            <CardTitle>{t("reports.toolInventoryStatus")}</CardTitle>
+            <CardDescription>{t("reports.categoryBreakdown")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-right px-2">Avail</TableHead>
-                    <TableHead className="text-right px-2">In Use</TableHead>
-                    <TableHead className="text-right px-2">Dmg</TableHead>
-                    <TableHead className="text-right px-2">Lost</TableHead>
-                    <TableHead className="text-right px-2">Total</TableHead>
+                    <TableHead>{t("common.category")}</TableHead>
+                    <TableHead className="text-right px-2">{t("reports.avail")}</TableHead>
+                    <TableHead className="text-right px-2">{t("reports.inUse")}</TableHead>
+                    <TableHead className="text-right px-2">{t("reports.dmg")}</TableHead>
+                    <TableHead className="text-right px-2">{t("reports.lost")}</TableHead>
+                    <TableHead className="text-right px-2">{t("reports.total")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
