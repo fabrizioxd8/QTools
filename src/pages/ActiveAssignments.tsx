@@ -19,6 +19,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppData, Assignment, ToolConditionString } from '@/contexts/AppDataContext';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 export default function ActiveAssignments() {
   const { t } = useTranslation();
@@ -116,7 +117,7 @@ export default function ActiveAssignments() {
           const sum = Object.values(toolConditions[tool.id] || {}).reduce((a, b) => Number(a) + Number(b), 0);
           const expected = tool.quantity || 1;
           if (sum !== expected) {
-            toast.error(`Quantity mismatch for ${tool.name}. Expected ${expected}, got ${sum}.`);
+            toast.error(t('assignments.quantityMismatch', { name: tool.name, expected, sum }));
             return;
           }
         }
@@ -150,7 +151,7 @@ export default function ActiveAssignments() {
           const sum = Object.values(toolConditions[tool.id] || {}).reduce((a, b) => Number(a) + Number(b), 0);
           const expected = tool.quantity || 1;
           if (sum !== expected) {
-            toast.error(`Quantity mismatch for ${tool.name}. Expected ${expected}, got ${sum}.`);
+            toast.error(t('assignments.quantityMismatch', { name: tool.name, expected, sum }));
             return;
           }
         }
@@ -196,6 +197,16 @@ export default function ActiveAssignments() {
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400 border-yellow-200/60 dark:border-yellow-700/40';
       default:
         return 'bg-secondary text-secondary-foreground';
+    }
+  };
+
+  const tCondition = (cond: string) => {
+    switch (cond) {
+      case 'good': return t('assignments.conditionGood');
+      case 'damaged': return t('assignments.conditionDamaged');
+      case 'lost': return t('assignments.conditionLost');
+      case 'missing': return t('assignments.conditionMissing');
+      default: return cond;
     }
   };
 
@@ -269,7 +280,7 @@ export default function ActiveAssignments() {
                             {isLongCheckout && (
                               <Badge variant="destructive">
                                 <AlertCircle className="mr-1 h-3 w-3" />
-                                {daysOut} day{daysOut !== 1 ? 's' : ''} out
+                                {t('assignments.daysOut', { count: daysOut })}
                               </Badge>
                             )}
                           </div>
@@ -289,14 +300,14 @@ export default function ActiveAssignments() {
                           </div>
                         </div>
                         <Button onClick={() => openCheckInDialog(assignment)}>
-                          Check In
+                          {t('assignments.checkIn')}
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
                         <div>
-                          <p className="font-semibold mb-2">Tools ({assignment.tools.length}):</p>
+                          <p className="font-semibold mb-2">{t('assignments.tools')} ({assignment.tools.length})</p>
                           <div className="flex flex-wrap gap-2">
                             {assignment.tools.map(tool => (
                               <Badge key={tool.id} variant="outline">
@@ -309,7 +320,7 @@ export default function ActiveAssignments() {
 
                         {assignment.checkoutNotes && (
                           <div>
-                            <p className="font-semibold mb-1">Checkout Notes:</p>
+                            <p className="font-semibold mb-1">{t('assignments.checkoutNotes')}</p>
                             <p className="text-sm text-muted-foreground">{assignment.checkoutNotes}</p>
                           </div>
                         )}
@@ -388,13 +399,13 @@ export default function ActiveAssignments() {
                           <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
-                              Out: {new Date(assignment.checkoutDate).toLocaleDateString()}
+                              {t('assignments.out')}: {new Date(assignment.checkoutDate).toLocaleDateString()}
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
-                              In: {assignment.checkinDate && new Date(assignment.checkinDate).toLocaleDateString()}
+                              {t('assignments.in')}: {assignment.checkinDate && new Date(assignment.checkinDate).toLocaleDateString()}
                             </div>
-                            <Badge variant="outline">{duration} days</Badge>
+                            <Badge variant="outline">{t('assignments.daysOut', { count: duration })}</Badge>
                             <div className="flex items-center gap-1">
                               <User className="h-4 w-4" />
                               {assignment.worker.name}
@@ -454,14 +465,14 @@ export default function ActiveAssignments() {
                           }}
                         >
                           <Edit className="mr-2 h-4 w-4" />
-                          Edit Check-In
+                          {t('assignments.editCheckIn')}
                         </Button>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
                         <div>
-                          <p className="font-semibold mb-2">Tools:</p>
+                          <p className="font-semibold mb-2">{t('assignments.tools')}:</p>
                           <div className="flex flex-wrap gap-2">
                             {assignment.tools.map(tool => {
                               const conditions = assignment.toolConditions?.[tool.id];
@@ -472,7 +483,7 @@ export default function ActiveAssignments() {
                                 return (
                                   <Badge key={tool.id} className={getConditionBadgeClass(cond as ToolConditionString)}>
                                     <Icon className="mr-1 h-3 w-3" />
-                                    {tool.name} ({cond})
+                                    {tool.name} ({tCondition(cond)})
                                     {tool.quantity && tool.quantity > 1 ? ` (${tool.quantity})` : ''}
                                   </Badge>
                                 );
@@ -485,7 +496,7 @@ export default function ActiveAssignments() {
                                   return (
                                     <Badge key={`${tool.id}-${cond}`} className={getConditionBadgeClass(cond as ToolConditionString)}>
                                       <Icon className="mr-1 h-3 w-3" />
-                                      {tool.name} ({cond}: {qty})
+                                      {tool.name} ({tCondition(cond)}: {qty})
                                     </Badge>
                                   );
                                 });
@@ -495,14 +506,14 @@ export default function ActiveAssignments() {
 
                         {assignment.checkoutNotes && (
                           <div>
-                            <p className="font-semibold mb-1">Checkout Notes:</p>
+                            <p className="font-semibold mb-1">{t('assignments.checkoutNotes')}</p>
                             <p className="text-sm text-muted-foreground">{assignment.checkoutNotes}</p>
                           </div>
                         )}
 
                         {assignment.checkinNotes && (
                           <div>
-                            <p className="font-semibold mb-1">Check-in Notes:</p>
+                            <p className="font-semibold mb-1">{t('assignments.checkinNotes')}</p>
                             <p className="text-sm text-muted-foreground">{assignment.checkinNotes}</p>
                           </div>
                         )}
@@ -522,7 +533,7 @@ export default function ActiveAssignments() {
           <DialogHeader>
             <DialogTitle>{t("assignments.checkInTitle")}</DialogTitle>
             <DialogDescription>
-              Review each tool's condition and add any notes
+              {t('assignments.checkInDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -559,7 +570,7 @@ export default function ActiveAssignments() {
                                 {cond === 'missing' && <Clock className="h-4 w-4 text-yellow-600" />}
                                 {cond === 'damaged' && <AlertCircle className="h-4 w-4 text-orange-600" />}
                                 {cond === 'lost' && <XCircle className="h-4 w-4 text-red-600" />}
-                                <Label htmlFor={`${tool.id}-${cond}`} className="capitalize">{cond}</Label>
+                                <Label htmlFor={`${tool.id}-${cond}`} className="capitalize">{tCondition(cond)}</Label>
                               </div>
                               <Input
                                 id={`${tool.id}-${cond}`}
@@ -598,7 +609,7 @@ export default function ActiveAssignments() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Check-in Date</Label>
+                  <Label className="text-sm font-semibold">{t('assignments.checkinDate')}</Label>
                   <div className="flex items-center">
                     <Input
                       type="date"
@@ -607,7 +618,7 @@ export default function ActiveAssignments() {
                       className="w-auto h-11 max-w-[200px]"
                     />
                     <div className="ml-4">
-                      <Label className="sr-only" htmlFor="checkin-time">Check-in time</Label>
+                      <Label className="sr-only" htmlFor="checkin-time">{t('assignments.checkinTime')}</Label>
                       <Input
                         id="checkin-time"
                         type="time"
@@ -647,7 +658,7 @@ export default function ActiveAssignments() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCheckInDialog(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCheckInDialog(null)}>{t('common.cancel')}</Button>
             <Button
               onClick={handleCheckIn}
               disabled={
@@ -658,7 +669,7 @@ export default function ActiveAssignments() {
                 })
               }
             >
-              Confirm Check-In
+              {t('assignments.confirmCheckIn')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -670,7 +681,7 @@ export default function ActiveAssignments() {
           <DialogHeader>
             <DialogTitle>{t("assignments.editCheckInTitle")}</DialogTitle>
             <DialogDescription>
-              Update tool conditions and notes for this completed assignment
+              {t('assignments.editCheckInDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -707,7 +718,7 @@ export default function ActiveAssignments() {
                                 {cond === 'missing' && <Clock className="h-4 w-4 text-yellow-600" />}
                                 {cond === 'damaged' && <AlertCircle className="h-4 w-4 text-orange-600" />}
                                 {cond === 'lost' && <XCircle className="h-4 w-4 text-red-600" />}
-                                <Label htmlFor={`edit-${tool.id}-${cond}`} className="capitalize">{cond}</Label>
+                                <Label htmlFor={`edit-${tool.id}-${cond}`} className="capitalize">{tCondition(cond)}</Label>
                               </div>
                               <Input
                                 id={`edit-${tool.id}-${cond}`}
@@ -746,7 +757,7 @@ export default function ActiveAssignments() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Check-in Date</Label>
+                  <Label className="text-sm font-semibold">{t('assignments.checkinDate')}</Label>
                   <div className="flex items-center">
                     <Input
                       type="date"
@@ -755,7 +766,7 @@ export default function ActiveAssignments() {
                       className="w-auto h-11 max-w-[200px]"
                     />
                     <div className="ml-4">
-                      <Label className="sr-only" htmlFor="edit-checkin-time">Check-in time</Label>
+                      <Label className="sr-only" htmlFor="edit-checkin-time">{t('assignments.checkinTime')}</Label>
                       <Input
                         id="edit-checkin-time"
                         type="time"
@@ -795,7 +806,7 @@ export default function ActiveAssignments() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingCompletedAssignment(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditingCompletedAssignment(null)}>{t('common.cancel')}</Button>
             <Button
               onClick={handleEditCheckIn}
               disabled={
@@ -806,7 +817,7 @@ export default function ActiveAssignments() {
                 })
               }
             >
-              Update Check-In
+              {t('assignments.updateCheckIn')}
             </Button>
           </DialogFooter>
         </DialogContent>

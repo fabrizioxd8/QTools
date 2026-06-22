@@ -299,19 +299,19 @@ export default function Reports() {
   const brandAccent = '#0f766e';
 
   const chartValues = [
-    { label: 'Checked Out', value: toolsCheckedOut, color: brandPrimary },
-    { label: 'Checked In', value: toolsReturned, color: brandLighter },
-    { label: 'Active Tools', value: currentlyActive, color: brandAccent },
+    { label: t('reports.toolsCheckedOut'), value: toolsCheckedOut, color: brandPrimary },
+    { label: t('reports.toolsReturned'), value: toolsReturned, color: brandLighter },
+    { label: t('reports.currentlyActive'), value: currentlyActive, color: brandAccent },
   ];
   const totalChart = chartValues.reduce((sum, item) => sum + item.value, 0) || 1;
   const maxDaily = Math.max(...dailyMovements.slice(0, 6).map(day => day.checkedOut + day.checkedIn), 1);
 
   const handleExportPDF = () => {
     const summaryRows = [
-      ['Projects involved', String(totalProjects)],
-      ['Tools checked out', String(toolsCheckedOut)],
-      ['Tools returned', String(toolsReturned)],
-      ['Currently active tools', String(currentlyActive)],
+      [t('reports.totalProjects'), String(totalProjects)],
+      [t('reports.toolsCheckedOut'), String(toolsCheckedOut)],
+      [t('reports.toolsReturned'), String(toolsReturned)],
+      [t('reports.currentlyActive'), String(currentlyActive)],
     ];
 
     const detailsRows = filteredActivityLog.map(item => ({
@@ -343,7 +343,7 @@ export default function Reports() {
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast.error('Unable to open report window. Please allow pop-ups to export PDF.');
+      toast.error(t('reports.exportWindowError'));
       return;
     }
 
@@ -352,7 +352,7 @@ export default function Reports() {
       <html lang="en">
         <head>
           <meta charset="utf-8" />
-          <title>Weekly Tool Movement Report</title>
+          <title>${t('reports.title')}</title>
           <style>
             body { font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 24px; color: #0f172a; background: #ffffff; }
             .page { max-width: 1100px; margin: 0 auto; }
@@ -394,23 +394,23 @@ export default function Reports() {
           <div class="page">
             <div class="header">
               <div class="header-copy">
-                <h1>Weekly Tool Movement Report</h1>
+                <h1>${t('reports.title')}</h1>
                 <p class="subtitle">${t("reports.forTheWeekOf")} ${pdfDateRangeLabel}</p>
               </div>
               <img class="logo" src="${window.location.origin}/brand.png" alt="Company logo" />
             </div>
 
             <section class="section">
-              <div class="section-title">Tool Activity Overview</div>
+              <div class="section-title">${t('reports.toolActivityDesc')}</div>
               <table>
                 <thead>
                   <tr>
-                    <th>Date and time</th>
+                    <th>${t('reports.dateTime')}</th>
                     <th>${t("reports.action")}</th>
                     <th>${t("reports.worker")}</th>
                     <th>${t("reports.project")}</th>
-                    <th>Tool details</th>
-                    <th>Quantity</th>
+                    <th>${t('reports.tool') /* tool details */}</th>
+                    <th>${t('common.quantity')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -429,7 +429,7 @@ export default function Reports() {
             </section>
 
             <section class="section">
-              <div class="section-title">Summary of Activity</div>
+              <div class="section-title">${t('reports.usageBreakdown')}</div>
               <div class="summary-grid">
                 ${summaryRows.map(([label, value]) => `
                   <div class="summary-card">
@@ -441,19 +441,19 @@ export default function Reports() {
             </section>
 
             <section class="section">
-              <div class="section-title">Current Status</div>
+              <div class="section-title">${t('reports.toolInventoryStatus')}</div>
               <ul class="status-list">
-                <li><strong>Total tools in use now:</strong> ${currentlyActive}</li>
-                <li><strong>Successfully checked in:</strong> ${toolsReturned}</li>
-                <li><strong>Total movements this week:</strong> ${totalActivities}</li>
+                <li><strong>${t('reports.currentlyActive')}:</strong> ${currentlyActive}</li>
+                <li><strong>${t('reports.toolsReturned')}:</strong> ${toolsReturned}</li>
+                <li><strong>${t('reports.weeklyMovements')}:</strong> ${totalActivities}</li>
               </ul>
             </section>
 
             <section class="section">
-              <div class="section-title">Activity Breakdown</div>
+              <div class="section-title">${t('reports.weeklyMovements')}</div>
               <div class="chart-row">
                 <div>
-                  <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:12px;">Daily movements</div>
+                  <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:12px;">${t('reports.weeklyMovements')}</div>
                   ${barRows.map(row => `
                     <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:16px;">
                       <div class="bar-label">${row.label}</div>
@@ -464,13 +464,13 @@ export default function Reports() {
                         <div class="bar-track" style="margin-top:8px; background:#dbf6f3;">
                           <div class="bar-fill" style="width:${Math.round((row.checkedIn / maxDaily) * 100)}%; background:${brandLighter};"></div>
                         </div>
-                        <div class="bar-stats"><span>Out ${row.checkedOut}</span><span>In ${row.checkedIn}</span></div>
+                        <div class="bar-stats"><span>${t('assignments.out')} ${row.checkedOut}</span><span>${t('assignments.in')} ${row.checkedIn}</span></div>
                       </div>
                     </div>
                   `).join('')}
                 </div>
                 <div class="pie-card">
-                  <div style="text-align:center; font-weight:700; margin-bottom:12px; color:#0f172a;">Tool Usage Breakdown</div>
+                  <div style="text-align:center; font-weight:700; margin-bottom:12px; color:#0f172a;">${t('reports.usageBreakdown')}</div>
                   <div class="pie-chart"></div>
                   <div class="pie-legend">
                     ${piePercentages.map(item => `
@@ -480,7 +480,7 @@ export default function Reports() {
                 </div>
               </div>
               <div class="trend-card">
-                <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:10px;">Weekly trend line</div>
+                <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:10px;">${t('reports.weeklyTrend')}</div>
                 <svg class="trend-chart" viewBox="0 0 700 160" preserveAspectRatio="none">
                   <polyline class="trend-line" points="${trendPoints}" />
                   ${dailyMovements.slice(0, 6).map((day, index) => {
@@ -509,7 +509,33 @@ export default function Reports() {
       printWindow.print();
     };
 
-    toast.success('PDF report generated. Use your browser print dialog to save as PDF.');
+    toast.success(t('reports.pdfGenerated'));
+  };
+
+  const categoryKeyMap: Record<string, string> = {
+    'hand tools': 'handTools',
+    'power tools': 'powerTools',
+    'measurement instruments': 'measurementInstruments',
+    'measurement': 'measurement',
+    'safety equipment': 'safetyEquipment',
+    'safety': 'safety',
+    'electrical': 'electrical',
+    'mechanical': 'mechanical',
+    'cleaning and maintenance': 'cleaning',
+    'workstation equipment': 'workstation',
+    'accessories': 'accessories',
+    'calibration equipment': 'calibrationEquipment',
+    'consumables': 'consumables',
+    'other': 'other',
+  };
+
+  const normalizeKey = (value: string) => value.trim().toLowerCase();
+
+  const translateCategory = (category: string) => {
+    const key = normalizeKey(category);
+    return categoryKeyMap[key]
+      ? t(`tools.categories.${categoryKeyMap[key]}`, { defaultValue: category })
+      : category;
   };
 
   const categoryBreakdown = tools.reduce((acc, tool) => {
@@ -532,31 +558,31 @@ export default function Reports() {
 
   const handlePrint = () => {
     window.print();
-    toast.success('Opening print dialog...');
+    toast.success(t('reports.openingPrintDialog'));
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground">View activity logs and inventory status</p>
+          <h1 className="text-3xl font-bold">{t('reports.title')}</h1>
+          <p className="text-muted-foreground">{t('reports.subtitle')}</p>
         </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline">
               <FileText className="mr-2 h-4 w-4" />
-              Export Options
+              {t('common.export')}
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer">
-              <Download className="mr-2 h-4 w-4" /> Export PDF
+              <Download className="mr-2 h-4 w-4" /> {t('reports.exportPdf')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handlePrint} className="cursor-pointer">
-              <Printer className="mr-2 h-4 w-4" /> Print
+              <Printer className="mr-2 h-4 w-4" /> {t('reports.printReport')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -590,15 +616,15 @@ export default function Reports() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="7">Last 7 days</SelectItem>
-                    <SelectItem value="30">Last 30 days</SelectItem>
-                    <SelectItem value="90">Last 90 days</SelectItem>
-                    <SelectItem value="custom">Custom range</SelectItem>
+                    <SelectItem value="7">{t('reports.last7Days')}</SelectItem>
+                    <SelectItem value="30">{t('reports.last30Days')}</SelectItem>
+                    <SelectItem value="90">{t('reports.last90Days')}</SelectItem>
+                    <SelectItem value="custom">{t('reports.customRange')}</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Start date</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('reports.startDate')}</label>
                   <Input
                     type="date"
                     value={startDateStr}
@@ -609,7 +635,7 @@ export default function Reports() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">End date</label>
+                  <label className="text-xs font-medium text-muted-foreground">{t('reports.endDate')}</label>
                   <Input
                     type="date"
                     value={endDateStr}
@@ -841,7 +867,7 @@ export default function Reports() {
                 <TableBody>
                   {Object.entries(categoryBreakdown).map(([category, stats]) => (
                     <TableRow key={category}>
-                      <TableCell className="font-medium px-2">{category}</TableCell>
+                      <TableCell className="font-medium px-2">{translateCategory(category)}</TableCell>
                       <TableCell className="text-right px-2">{stats.available}</TableCell>
                       <TableCell className="text-right px-2">{stats.inUse}</TableCell>
                       <TableCell className="text-right px-2">{stats.damaged}</TableCell>

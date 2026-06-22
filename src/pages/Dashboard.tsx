@@ -15,6 +15,46 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const { tools, assignments } = useAppData();
   const { t } = useTranslation();
 
+  const categoryKeyMap: Record<string, string> = {
+    'hand tools': 'handTools',
+    'power tools': 'powerTools',
+    'measurement instruments': 'measurementInstruments',
+    'measurement': 'measurement',
+    'safety equipment': 'safetyEquipment',
+    'safety': 'safety',
+    'electrical': 'electrical',
+    'mechanical': 'mechanical',
+    'cleaning and maintenance': 'cleaning',
+    'workstation equipment': 'workstation',
+    'accessories': 'accessories',
+    'calibration equipment': 'calibrationEquipment',
+    'consumables': 'consumables',
+    'other': 'other',
+  };
+
+  const normalizeKey = (value: string) => value.trim().toLowerCase();
+
+  const translateCategory = (category: string) => {
+    const key = normalizeKey(category);
+    return categoryKeyMap[key]
+      ? t(`tools.categories.${categoryKeyMap[key]}`, { defaultValue: category })
+      : category;
+  };
+
+  const statusKeyMap: Record<string, string> = {
+    'Available': 'Available',
+    'In Use': 'In Use',
+    'Damaged': 'Damaged',
+    'Lost': 'Lost',
+    'Missing': 'Missing',
+    'Cal. Due': 'Cal. Due',
+  };
+
+  const translateStatus = (status: string) =>
+    statusKeyMap[status]
+      ? t(`tools.statusLabels.${statusKeyMap[status]}`, { defaultValue: status })
+      : status;
+
   const totalTools = tools.length;
   const availableTools = tools.filter(t => t.status === 'Available').length;
   const inUseTools = tools.filter(t => t.status === 'In Use').length;
@@ -119,7 +159,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       <div key={tool.id} className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-sm">{tool.name}</p>
-                          <p className="text-xs text-muted-foreground">{tool.category}</p>
+                          <p className="text-xs text-muted-foreground">{translateCategory(tool.category)}</p>
                         </div>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -198,7 +238,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               {Object.entries(categoryBreakdown).map(([category, count]) => (
                 <div key={category} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{category}</span>
+                    <span className="font-medium">{translateCategory(category)}</span>
                     <span className="text-muted-foreground">
                       {count} {t('dashboard.tools')}
                     </span>
@@ -224,7 +264,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
                 return (
                   <div key={status} className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{status}</span>
+                    <span className="text-sm font-medium">{translateStatus(status)}</span>
                     <Badge variant={badgeVariant}>{count}</Badge>
                   </div>
                 );

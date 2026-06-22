@@ -351,6 +351,11 @@ const en = {
     noMovement: 'No tool movement found for the chosen date range.',
     advancedFiltersTitle: 'Advanced Filters',
     reportRange: 'Report range',
+    startDate: 'Start date',
+    endDate: 'End date',
+    pdfGenerated: 'PDF generated successfully!',
+    exportWindowError: 'Unable to open report window. Please allow pop-ups to export PDF.',
+    openingPrintDialog: 'Opening print dialog...',
   },
 } as const;
 

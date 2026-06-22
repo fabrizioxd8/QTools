@@ -78,6 +78,14 @@ export default function ToolsManager() {
 
   // Translate a stored attribute key to the current language's label
   const tAttrKey = (key: string) => t(`tools.attrKeys.${key}`, { defaultValue: key });
+  const translateCategory = (category: string) =>
+    categoryKeyMap[category]
+      ? t(`tools.categories.${categoryKeyMap[category]}`, { defaultValue: category })
+      : category;
+  const translateStatus = (status: string) =>
+    statusKeyMap[status]
+      ? t(`tools.statusLabels.${statusKeyMap[status]}`, { defaultValue: status })
+      : status;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTool, setEditingTool] = useState<Tool | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -489,7 +497,7 @@ export default function ToolsManager() {
       <Tooltip key={`in-use-${toolId}`}>
         <TooltipTrigger asChild>
           <span className="cursor-help">
-            <Badge variant={getStatusBadgeVariant('In Use')}>In Use</Badge>
+            <Badge variant={getStatusBadgeVariant('In Use')}>{t('tools.statusLabels.In Use', { defaultValue: 'In Use' })}</Badge>
           </span>
         </TooltipTrigger>
         <TooltipContent>
@@ -498,7 +506,7 @@ export default function ToolsManager() {
               {entries.map((e, i) => (
                 <div key={i} className="text-sm">
                   {e.missing
-                    ? <><span className="text-yellow-400 font-semibold">Missing</span> — last seen: <strong>{e.projectName}</strong> ({e.qty})</>
+                    ? <><span className="text-yellow-400 font-semibold">{t('tools.statusLabels.Missing', { defaultValue: 'Missing' })}</span> — last seen: <strong>{e.projectName}</strong> ({e.qty})</>
                     : <><strong>{e.projectName}</strong>: {e.qty}</>
                   }
                 </div>
@@ -533,6 +541,16 @@ export default function ToolsManager() {
         const assignedProjectList = Array.from(
           new Set(activeAssignments.map(asg => asg.project.name))
         ).join(', ');
+
+        const completedWithTool = assignments
+          .filter(asg => asg.status === 'completed' && asg.tools.some(t => t.id === tool.id))
+          .sort((a, b) => {
+            const aDate = a.checkinDate ? new Date(a.checkinDate).getTime() : 0;
+            const bDate = b.checkinDate ? new Date(b.checkinDate).getTime() : 0;
+            return bDate - aDate;
+          });
+
+        const lastProjectAssigned = completedWithTool.length > 0 ? completedWithTool[0].project.name : assignedProjectList;
 
         // Get guia de remision: from the most recent active assignment for this tool
         // If no active, try the most recent completed assignment
@@ -581,11 +599,11 @@ export default function ToolsManager() {
           guia: string
         ): Record<string, string | number> => ({
           'Instrumento': tool.name,
-          'Categoría': tool.category,
+          'Categoría': translateCategory(tool.category),
           'Marca': tool.customAttributes['Brand'] || tool.customAttributes['Marca'] || '',
           'Modelo': tool.customAttributes['Model'] || tool.customAttributes['Modelo'] || '',
           'Serie': tool.customAttributes['Serial Number'] || tool.customAttributes['Serie'] || '',
-          'Estado del Equipo': status,
+          'Estado del Equipo': translateStatus(status),
           'Cantidad': qty,
           'Proyecto Asignado': projectAssigned,
           'Guía de Remisión': guia,
@@ -637,7 +655,7 @@ export default function ToolsManager() {
           const lostQty = lostTotal > 0 ? lostTotal : (extTool.lostQuantity || 0);
           if (damagedQty > 0 && tool.status !== 'Damaged') { data.push(buildRow('Damaged', damagedQty, '', '')); hasExported = true; }
           if (lostQty > 0 && tool.status !== 'Lost') { data.push(buildRow('Lost', lostQty, '', '')); hasExported = true; }
-          if (missingTotal > 0) { data.push(buildRow('Missing', missingTotal, '', '')); hasExported = true; }
+          if (missingTotal > 0) { data.push(buildRow('Missing', missingTotal, lastProjectAssigned, guiaDeRemision)); hasExported = true; }
 
           const isCalDue = (() => {
             if (!tool.isCalibrable || !tool.calibrationDue) return false;
@@ -665,7 +683,7 @@ export default function ToolsManager() {
           } else if (statusFilter === 'Lost') {
             data.push(buildRow('Lost', (extTool as { lostQuantity?: number }).lostQuantity || 0, '', ''));
           } else if (statusFilter === 'Missing') {
-            data.push(buildRow('Missing', (extTool as { missingQuantity?: number }).missingQuantity || 0, '', ''));
+            data.push(buildRow('Missing', (extTool as { missingQuantity?: number }).missingQuantity || 0, lastProjectAssigned, guiaDeRemision));
           } else if (statusFilter === 'Cal. Due') {
             const calQty = (extTool.quantity || 0) + inUseTotal;
             data.push(buildRow('Cal. Due', calQty > 0 ? calQty : 1, assignedProjectList, guiaDeRemision));
@@ -933,7 +951,9 @@ export default function ToolsManager() {
                 </div>
                 <CardTitle className="text-lg">{tool.name}</CardTitle>
                 <div className="flex gap-2 flex-wrap">
-                  <Badge variant="outline">{tool.category}</Badge>
+                  <Badge variant="outline">
+                    {t(`tools.categories.${categoryKeyMap[tool.category]}`, { defaultValue: tool.category })}
+                  </Badge>
                   {/* Status badge with optional tooltip when In Use */}
                   {(() => {
                     const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
@@ -942,7 +962,7 @@ export default function ToolsManager() {
                       const showInUse = (extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0;
                       return (
                         <>
-                          {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>}
+                          {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{t(`tools.statusLabels.${statusKeyMap[tool.status]}`, { defaultValue: tool.status })}</Badge>}
                           {(showInUse || tool.status === 'In Use') && renderInUseBadge(tool.id)}
                         </>
                       );
@@ -968,7 +988,7 @@ export default function ToolsManager() {
                       return renderInUseBadge(tool.id);
                     }
 
-                    return <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>;
+                    return <Badge variant={getStatusBadgeVariant(displayStatus)}>{t(`tools.statusLabels.${statusKeyMap[displayStatus]}`, { defaultValue: displayStatus })}</Badge>;
                   })()}
                   {/* Show quantity based on filter or if > 1 */}
                   {(() => {
@@ -1062,7 +1082,9 @@ export default function ToolsManager() {
                       <div>
                         <h3 className="font-semibold text-lg">{tool.name}</h3>
                         <div className="flex gap-2 mt-1">
-                          <Badge variant="outline">{tool.category}</Badge>
+                          <Badge variant="outline">
+                            {t(`tools.categories.${categoryKeyMap[tool.category]}`, { defaultValue: tool.category })}
+                          </Badge>
                           {(() => {
                             const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
 
@@ -1070,7 +1092,7 @@ export default function ToolsManager() {
                               const showInUse = (extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0;
                               return (
                                 <>
-                                  {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{tool.status}</Badge>}
+                                  {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{t(`tools.statusLabels.${statusKeyMap[tool.status]}`, { defaultValue: tool.status })}</Badge>}
                                   {(showInUse || tool.status === 'In Use') && renderInUseBadge(tool.id)}
                                 </>
                               );
@@ -1096,7 +1118,7 @@ export default function ToolsManager() {
                               return renderInUseBadge(tool.id);
                             }
 
-                            return <Badge variant={getStatusBadgeVariant(displayStatus)}>{displayStatus}</Badge>;
+                            return <Badge variant={getStatusBadgeVariant(displayStatus)}>{t(`tools.statusLabels.${statusKeyMap[displayStatus]}`, { defaultValue: displayStatus })}</Badge>;
                           })()}
                           {/* Show quantity based on filter or if > 1 */}
                           {(() => {
