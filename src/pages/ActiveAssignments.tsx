@@ -21,6 +21,7 @@ import { useAppData, Assignment, ToolConditionString } from '@/contexts/AppDataC
 import { toast } from 'sonner';
 
 export default function ActiveAssignments() {
+  const { t } = useTranslation();
   const { assignments, checkInAssignment } = useAppData();
   const [checkInDialog, setCheckInDialog] = useState<Assignment | null>(null);
   const [toolConditions, setToolConditions] = useState<Record<number, Record<'good' | 'damaged' | 'lost' | 'missing', number>>>({});
@@ -129,13 +130,13 @@ export default function ActiveAssignments() {
         }
 
         await checkInAssignment(checkInDialog.id, checkinDateTime, checkinNotes, toolConditions, returnGuide.trim() || undefined);
-        toast.success('Tools checked in successfully!');
+        toast.success(t('assignments.checkInSuccess'));
         setCheckInDialog(null);
         setCheckinNotes('');
         setReturnGuide('');
         setToolConditions({});
       } catch (error) {
-        toast.error('Failed to check in tools. Please try again.');
+        toast.error(t('assignments.checkInFailed'));
         console.error('Error checking in assignment:', error);
       }
     }
@@ -162,13 +163,13 @@ export default function ActiveAssignments() {
         }
 
         await checkInAssignment(editingCompletedAssignment.id, checkinDateTime, checkinNotes, toolConditions, returnGuide.trim() || undefined);
-        toast.success('Check-in updated successfully!');
+        toast.success(t('assignments.checkInUpdatedSuccess'));
         setEditingCompletedAssignment(null);
         setCheckinNotes('');
         setReturnGuide('');
         setToolConditions({});
       } catch (error) {
-        toast.error('Failed to update check-in. Please try again.');
+        toast.error(t('assignments.checkInUpdateFailed'));
         console.error('Error updating check-in:', error);
       }
     }
@@ -201,14 +202,14 @@ export default function ActiveAssignments() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Assignments</h1>
-        <p className="text-muted-foreground">Track active and completed tool assignments</p>
+        <h1 className="text-3xl font-bold">{t("assignments.title")}</h1>
+        <p className="text-muted-foreground">{t("assignments.subtitle")}</p>
       </div>
 
       <Tabs defaultValue="active" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="active">Active Assignments</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsTrigger value="active">{t("assignments.activeTab")}</TabsTrigger>
+          <TabsTrigger value="completed">{t("assignments.completedTab")}</TabsTrigger>
         </TabsList>
 
         {/* Active Assignments */}
@@ -216,7 +217,7 @@ export default function ActiveAssignments() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Active Assignments</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("assignments.activeCount")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-primary">{activeAssignments.length}</div>
@@ -225,7 +226,7 @@ export default function ActiveAssignments() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Tools Checked Out</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("assignments.toolsCheckedOut")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-info">
@@ -236,7 +237,7 @@ export default function ActiveAssignments() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Workers with Tools</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("assignments.workersWithTools")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-500">
@@ -249,7 +250,7 @@ export default function ActiveAssignments() {
           {activeAssignments.length === 0 ? (
             <Card>
               <CardContent className="py-12">
-                <p className="text-center text-muted-foreground">No active assignments</p>
+                <p className="text-center text-muted-foreground">{t("assignments.noActiveAssignments")}</p>
               </CardContent>
             </Card>
           ) : (
@@ -264,7 +265,7 @@ export default function ActiveAssignments() {
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Badge>Assignment #{assignment.id}</Badge>
+                            <Badge>{t("assignments.assignmentId", { id: assignment.id })}</Badge>
                             {isLongCheckout && (
                               <Badge variant="destructive">
                                 <AlertCircle className="mr-1 h-3 w-3" />
@@ -326,7 +327,7 @@ export default function ActiveAssignments() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Completed</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("assignments.totalCompleted")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{completedAssignments.length}</div>
@@ -335,7 +336,7 @@ export default function ActiveAssignments() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Tools Returned</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("assignments.toolsReturned")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-success">
@@ -346,7 +347,7 @@ export default function ActiveAssignments() {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Avg. Days Out</CardTitle>
+                <CardTitle className="text-sm font-medium">{t("assignments.avgDaysOut")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
@@ -368,7 +369,7 @@ export default function ActiveAssignments() {
           {completedAssignments.length === 0 ? (
             <Card>
               <CardContent className="py-12">
-                <p className="text-center text-muted-foreground">No completed assignments</p>
+                <p className="text-center text-muted-foreground">{t("assignments.noCompletedAssignments")}</p>
               </CardContent>
             </Card>
           ) : (
@@ -383,7 +384,7 @@ export default function ActiveAssignments() {
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="space-y-1 flex-1">
-                          <Badge>Assignment #{assignment.id}</Badge>
+                          <Badge>{t("assignments.assignmentId", { id: assignment.id })}</Badge>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
@@ -519,7 +520,7 @@ export default function ActiveAssignments() {
       <Dialog open={checkInDialog !== null} onOpenChange={() => setCheckInDialog(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Check In Tools</DialogTitle>
+            <DialogTitle>{t("assignments.checkInTitle")}</DialogTitle>
             <DialogDescription>
               Review each tool's condition and add any notes
             </DialogDescription>
@@ -549,7 +550,7 @@ export default function ActiveAssignments() {
                     const isMismatch = sum !== expected;
                     return (
                       <div className="space-y-3">
-                        <Label className="text-sm font-semibold">Tool Condition Quantities:</Label>
+                        <Label className="text-sm font-semibold">{t("assignments.toolConditionQuantities")}</Label>
                         <div className="grid grid-cols-2 gap-4">
                           {(['good', 'missing', 'damaged', 'lost'] as const).map((cond) => (
                             <div key={cond} className="space-y-1">
@@ -581,12 +582,12 @@ export default function ActiveAssignments() {
                         </div>
                         {isOver && (
                           <p className="text-xs text-destructive font-medium">
-                            Total exceeds expected: {sum} / {expected}. Reduce quantities before submitting.
+                            {t("assignments.totalExceeds", { sum, expected })}
                           </p>
                         )}
                         {!isOver && isMismatch && (
                           <p className="text-xs text-destructive">
-                            Total assigned: {sum} / Expected: {expected}
+                            {t("assignments.totalMismatch", { sum, expected })}
                           </p>
                         )}
                       </div>
@@ -633,9 +634,9 @@ export default function ActiveAssignments() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Notes (Optional)</Label>
+                  <Label>{t("assignments.notesOptional")}</Label>
                   <Textarea
-                    placeholder="Add any additional notes about this check-in..."
+                    placeholder={t("assignments.notesPlaceholder")}
                     value={checkinNotes}
                     onChange={(e) => setCheckinNotes(e.target.value)}
                     rows={4}
@@ -667,7 +668,7 @@ export default function ActiveAssignments() {
       <Dialog open={editingCompletedAssignment !== null} onOpenChange={() => setEditingCompletedAssignment(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Check-In</DialogTitle>
+            <DialogTitle>{t("assignments.editCheckInTitle")}</DialogTitle>
             <DialogDescription>
               Update tool conditions and notes for this completed assignment
             </DialogDescription>
@@ -697,7 +698,7 @@ export default function ActiveAssignments() {
                     const isMismatch = sum !== expected;
                     return (
                       <div className="space-y-3">
-                        <Label className="text-sm font-semibold">Tool Condition Quantities:</Label>
+                        <Label className="text-sm font-semibold">{t("assignments.toolConditionQuantities")}</Label>
                         <div className="grid grid-cols-2 gap-4">
                           {(['good', 'missing', 'damaged', 'lost'] as const).map((cond) => (
                             <div key={cond} className="space-y-1">
@@ -729,12 +730,12 @@ export default function ActiveAssignments() {
                         </div>
                         {isOver && (
                           <p className="text-xs text-destructive font-medium">
-                            Total exceeds expected: {sum} / {expected}. Reduce quantities before submitting.
+                            {t("assignments.totalExceeds", { sum, expected })}
                           </p>
                         )}
                         {!isOver && isMismatch && (
                           <p className="text-xs text-destructive">
-                            Total assigned: {sum} / Expected: {expected}
+                            {t("assignments.totalMismatch", { sum, expected })}
                           </p>
                         )}
                       </div>
@@ -781,9 +782,9 @@ export default function ActiveAssignments() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Notes (Optional)</Label>
+                  <Label>{t("assignments.notesOptional")}</Label>
                   <Textarea
-                    placeholder="Add any additional notes about this check-in..."
+                    placeholder={t("assignments.notesPlaceholder")}
                     value={checkinNotes}
                     onChange={(e) => setCheckinNotes(e.target.value)}
                     rows={4}
