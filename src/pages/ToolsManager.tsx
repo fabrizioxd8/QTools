@@ -47,10 +47,8 @@ import {
 const categories = ['Electrical', 'Mechanical', 'Safety', 'Measurement', 'Hand Tools', 'Power Tools', 'Cleaning and Maintenance', 'Workstation Equipment'];
 const statuses: (Tool['status'] | 'Missing')[] = ['Available', 'In Use', 'Damaged', 'Lost', 'Missing', 'Cal. Due'];
 
-// These are the canonical English keys stored in the DB — keep as-is
 const standardAttributes = ['Brand', 'Model', 'Serial Number', 'Custom'];
 
-// Map from DB-stored English category value → i18n key suffix
 const categoryKeyMap: Record<string, string> = {
   'Electrical': 'electrical',
   'Mechanical': 'mechanical',
@@ -62,7 +60,6 @@ const categoryKeyMap: Record<string, string> = {
   'Workstation Equipment': 'workstation',
 };
 
-// Map from DB-stored English status value → i18n key suffix
 const statusKeyMap: Record<string, string> = {
   'Available': 'Available',
   'In Use': 'In Use',
@@ -72,7 +69,6 @@ const statusKeyMap: Record<string, string> = {
   'Cal. Due': 'Cal. Due',
 };
 
-// Map from Spanish/variant attribute keys to canonical English keys for translation
 const attributeKeyNormalization: Record<string, string> = {
   'Marca': 'Brand',
   'marca': 'Brand',
@@ -110,11 +106,9 @@ export default function ToolsManager() {
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Layout controls
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [gridColumns, setGridColumns] = useState<2 | 3 | 4>(3);
 
-  // Sort controls
   const [sortField, setSortField] = useState<'name' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -138,7 +132,6 @@ export default function ToolsManager() {
     return sortDirection === 'asc' ? ArrowUp : ArrowDown;
   };
 
-  // Form state
   const [formData, setFormData] = useState({
     name: '',
     category: '',

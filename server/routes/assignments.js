@@ -115,15 +115,31 @@ router.post('/', async (req, res) => {
 
       assignmentId = result.id;
 
-      // Process each tool: ensure enough quantity, insert assignment_tools with quantity, decrement tools.quantity
+      // Process each tool: ensure enough quantity, insert assignment_tools with quantity
       for (const t of tools) {
-        // Check available quantity
-        const toolRow = await getQuery(`SELECT id, quantity FROM tools WHERE id = ?`, [t.toolId]);
-        const available = toolRow ? (toolRow.quantity || 0) : 0;
-        if (available < t.quantity) {
-          // Not enough: rollback and return error
+        // Check available quantity against total stock minus active assignments
+        const toolRow = await getQuery(`SELECT id, name, quantity FROM tools WHERE id = ?`, [t.toolId]);
+        if (!toolRow) {
           await runQuery('ROLLBACK');
-          return res.status(400).json({ error: `Not enough quantity for tool ${t.toolId}` });
+          return res.status(400).json({ error: `Tool with ID ${t.toolId} not found.` });
+        }
+        const totalStock = toolRow.quantity || 0;
+
+        const assignedRow = await getQuery(`
+          SELECT SUM(at.quantity) as totalAssigned
+          FROM assignment_tools at
+          JOIN assignments a ON at.assignmentId = a.id
+          WHERE at.toolId = ? AND a.status = 'active'
+        `, [t.toolId]);
+        const totalAssigned = assignedRow ? (assignedRow.totalAssigned || 0) : 0;
+
+        const available = totalStock - totalAssigned;
+
+        if (available < t.quantity) {
+          await runQuery('ROLLBACK');
+          return res.status(400).json({ 
+            error: `Not enough stock for "${toolRow.name}". Available: ${available}, Requested: ${t.quantity}.` 
+          });
         }
 
         await runQuery(`
@@ -131,10 +147,8 @@ router.post('/', async (req, res) => {
           VALUES (?, ?, ?)
         `, [assignmentId, t.toolId, t.quantity]);
 
-        // Decrement available quantity and mark as In Use (any checked-out units => In Use)
-        await runQuery(`
-          UPDATE tools SET quantity = quantity - ?, status = 'In Use' WHERE id = ?
-        `, [t.quantity, t.toolId]);
+        // Mark as In Use. DO NOT decrement total quantity.
+        await runQuery(`UPDATE tools SET status = 'In Use' WHERE id = ?`, [t.toolId]);
       }
 
       await runQuery('COMMIT');
@@ -296,18 +310,15 @@ router.put('/:id/checkin', async (req, res) => {
           const newCond = expandCondition(condition, restoreAmount);
 
           // Revert old quantities
-          if (oldCond.good    > 0) await runQuery(`UPDATE tools SET quantity        = quantity        - ? WHERE id = ?`, [oldCond.good,    toolId]);
           if (oldCond.damaged > 0) await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity - ? WHERE id = ?`, [oldCond.damaged, toolId]);
           if (oldCond.lost    > 0) await runQuery(`UPDATE tools SET lostQuantity    = lostQuantity    - ? WHERE id = ?`, [oldCond.lost,    toolId]);
 
           // Apply new quantities
-          if (newCond.good    > 0) await runQuery(`UPDATE tools SET quantity        = quantity        + ? WHERE id = ?`, [newCond.good,    toolId]);
           if (newCond.damaged > 0) await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`, [newCond.damaged, toolId]);
           if (newCond.lost    > 0) await runQuery(`UPDATE tools SET lostQuantity    = lostQuantity    + ? WHERE id = ?`, [newCond.lost,    toolId]);
         } else {
           const newCond = expandCondition(condition, restoreAmount);
 
-          if (newCond.good    > 0) await runQuery(`UPDATE tools SET quantity        = quantity        + ? WHERE id = ?`, [newCond.good,    toolId]);
           if (newCond.damaged > 0) await runQuery(`UPDATE tools SET damagedQuantity = damagedQuantity + ? WHERE id = ?`, [newCond.damaged, toolId]);
           if (newCond.lost    > 0) await runQuery(`UPDATE tools SET lostQuantity    = lostQuantity    + ? WHERE id = ?`, [newCond.lost,    toolId]);
           // missing: quantities stay at 0 — tool remains unaccounted

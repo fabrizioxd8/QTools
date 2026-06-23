@@ -48,10 +48,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
 
-  const availableTools = tools.filter(t => {
-    const qty = t.quantity ?? 0;
-    return t.status === 'Available' || (t.status === 'In Use' && qty > 0);
-  });
+  const availableTools = tools.filter(t => (t.availableQuantity ?? 0) > 0);
 
   const selectedToolTypes = selectedTools.length;
   const selectedItemCount = selectedTools.reduce((sum, tool) => sum + (tool.quantity || 1), 0);
@@ -256,7 +253,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const current = selectedTools.find(t => t.id === tool.id)?.quantity || 1;
-                                      updateSelectedToolQuantity(tool.id, Math.min(tool.quantity || 1, current + 1));
+                                      updateSelectedToolQuantity(tool.id, Math.min(tool.availableQuantity || 0, current + 1));
                                     }}
                                   >+</button>
                                 </div>
@@ -409,7 +406,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                         </div>
                         <div className="text-sm text-muted-foreground">
                           <div>{t('checkout.qty')}: {tool.quantity || 1}</div>
-                          <div>{t('checkout.available')}: {tools.find(t => t.id === tool.id)?.quantity ?? 0}</div>
+                          <div>{t('checkout.available')}: {tools.find(t => t.id === tool.id)?.availableQuantity ?? 0}</div>
                         </div>
                       </div>
                     </div>
