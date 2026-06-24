@@ -123,7 +123,7 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
   const progressPercentage = (currentStep / 4) * 100;
   const [showLoading, setShowLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const timeout = setTimeout(() => setShowLoading(false), 3000);
     return () => clearTimeout(timeout);
   }, []);
@@ -171,8 +171,8 @@ export default function CheckoutWizard({ onNavigate }: CheckoutWizardProps = {})
                     <div key={step.number} className="relative flex flex-col items-center text-center">
                       <div
                         className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-2 ${currentStep >= step.number
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background text-muted-foreground border-border'
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background text-muted-foreground border-border'
                           }`}
                       >
                         <step.icon className="h-5 w-5" />
