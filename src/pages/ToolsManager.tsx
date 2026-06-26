@@ -474,26 +474,36 @@ export default function ToolsManager() {
   // Build tooltip entries for a tool showing "In Use":
   // - Active assignments contribute real project + qty
   // - Completed assignments with missing qty contribute "Missing (Project)" entries
-  const buildInUseEntries = (toolId: number): Array<{ projectName: string; qty: number; missing?: boolean }> => {
-    const entries: Array<{ projectName: string; qty: number; missing?: boolean }> = [];
+  const buildInUseEntries = (toolId: number): Array<{ projectName: string; qty: number; status: 'inUse' | 'missing' | 'damaged' | 'lost' }> => {
+    const entries: Array<{ projectName: string; qty: number; status: 'inUse' | 'missing' | 'damaged' | 'lost' }> = [];
     assignments.forEach(asg => {
       if (asg.status === 'active') {
         asg.tools.forEach(t => {
           if (t.id === toolId && (t.quantity || 1) > 0) {
-            entries.push({ projectName: asg.project.name, qty: t.quantity || 1 });
+            entries.push({ projectName: asg.project.name, qty: t.quantity || 1, status: 'inUse' });
           }
         });
       }
       if (asg.status === 'completed' && asg.toolConditions) {
         const cond = asg.toolConditions[toolId];
-        if (cond && typeof cond === 'object') {
-          const missingQty = Number((cond as ToolConditionMap).missing) || 0;
-          if (missingQty > 0) {
-            entries.push({ projectName: asg.project.name, qty: missingQty, missing: true });
+        if (cond) {
+          if (typeof cond === 'object') {
+            const missingQty = Number((cond as ToolConditionMap).missing) || 0;
+            if (missingQty > 0) entries.push({ projectName: asg.project.name, qty: missingQty, status: 'missing' });
+
+            const damagedQty = Number((cond as ToolConditionMap).damaged) || 0;
+            if (damagedQty > 0) entries.push({ projectName: asg.project.name, qty: damagedQty, status: 'damaged' });
+
+            const lostQty = Number((cond as ToolConditionMap).lost) || 0;
+            if (lostQty > 0) entries.push({ projectName: asg.project.name, qty: lostQty, status: 'lost' });
+
+          } else { // Legacy string format
+            const toolInAsg = asg.tools.find(t => t.id === toolId);
+            const qty = toolInAsg?.quantity || 1;
+            if (cond === 'missing') entries.push({ projectName: asg.project.name, qty, status: 'missing' });
+            else if (cond === 'damaged') entries.push({ projectName: asg.project.name, qty, status: 'damaged' });
+            else if (cond === 'lost') entries.push({ projectName: asg.project.name, qty, status: 'lost' });
           }
-        } else if (cond === 'missing') {
-          const toolInAsg = asg.tools.find(t => t.id === toolId);
-          if (toolInAsg) entries.push({ projectName: asg.project.name, qty: toolInAsg.quantity || 1, missing: true });
         }
       }
     });
@@ -504,27 +514,49 @@ export default function ToolsManager() {
     const entries = buildInUseEntries(toolId);
     const hasEntries = entries.length > 0;
 
+    const inUseTotal = entries.filter(e => e.status === 'inUse').reduce((sum, e) => sum + e.qty, 0);
+
     return (
       <Tooltip key={`in-use-${toolId}`}>
         <TooltipTrigger asChild>
           <span className="cursor-help">
-            <Badge variant={getStatusBadgeVariant('In Use')}>{t('tools.statusLabels.In Use', { defaultValue: 'In Use' })}</Badge>
+            <Badge variant={getStatusBadgeVariant('In Use')}>
+              {t('tools.statusLabels.In Use')}
+              {inUseTotal > 0 ? `: ${inUseTotal}` : ''}
+            </Badge>
           </span>
         </TooltipTrigger>
         <TooltipContent>
           {hasEntries ? (
             <div className="space-y-1">
-              {entries.map((e, i) => (
-                <div key={i} className="text-sm">
-                  {e.missing
-                    ? <><span className="text-yellow-400 font-semibold">{t('tools.statusLabels.Missing', { defaultValue: 'Missing' })}</span> — last seen: <strong>{e.projectName}</strong> ({e.qty})</>
-                    : <><strong>{e.projectName}</strong>: {e.qty}</>
-                  }
-                </div>
-              ))}
+              {entries.map((e, i) => {
+                let statusLabel = '';
+                let statusStyle = '';
+                switch (e.status) {
+                  case 'missing':
+                    statusLabel = t('tools.statusLabels.Missing');
+                    statusStyle = 'text-yellow-400 font-semibold';
+                    break;
+                  case 'damaged':
+                    statusLabel = t('tools.statusLabels.Damaged');
+                    statusStyle = 'text-red-400 font-semibold';
+                    break;
+                  case 'lost':
+                    statusLabel = t('tools.statusLabels.Lost');
+                    statusStyle = 'text-red-500 font-semibold';
+                    break;
+                  default: // 'inUse'
+                    return <div key={i} className="text-sm"><strong>{e.projectName}</strong>: {e.qty}</div>;
+                }
+                return (
+                  <div key={i} className="text-sm">
+                    <span className={statusStyle}>{statusLabel}</span> — last seen: <strong>{e.projectName}</strong> ({e.qty})
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No active assignment data</p>
+            <p className="text-sm text-muted-foreground">{t('tools.noAssignmentData')}</p>
           )}
         </TooltipContent>
       </Tooltip>
@@ -537,63 +569,31 @@ export default function ToolsManager() {
       const toolsToExport = filteredTools;
 
       toolsToExport.forEach(tool => {
-        const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number };
+        const extTool = tool as ExtendedTool & { availableQuantity?: number; inUseQuantity?: number; damagedQuantity?: number; lostQuantity?: number; missingQuantity?: number };
 
-        // Gather active assignment info for this tool
-        const activeAssignments = assignments.filter(asg =>
-          asg.status === 'active' && asg.tools.some(t => t.id === tool.id)
-        );
+        const { availableQuantity = 0, inUseQuantity = 0, damagedQuantity = 0, lostQuantity = 0, missingQuantity = 0 } = extTool;
 
-        const inUseTotal = activeAssignments.reduce((sum, asg) => {
-          const t = asg.tools.find(t => t.id === tool.id);
-          return sum + (t?.quantity || 1);
-        }, 0);
+        const entries = buildInUseEntries(tool.id);
+        const activeAssignments = entries.filter(e => e.status === 'inUse');
+        const completedAssignments = entries.filter(e => e.status !== 'inUse');
 
-        const assignedProjectList = Array.from(
-          new Set(activeAssignments.map(asg => asg.project.name))
-        ).join(', ');
+        const assignedProjectList = Array.from(new Set(activeAssignments.map(e => e.projectName))).join(', ');
 
-        const completedWithTool = assignments
-          .filter(asg => asg.status === 'completed' && asg.tools.some(t => t.id === tool.id))
-          .sort((a, b) => {
-            const aDate = a.checkinDate ? new Date(a.checkinDate).getTime() : 0;
-            const bDate = b.checkinDate ? new Date(b.checkinDate).getTime() : 0;
-            return bDate - aDate;
-          });
+        // Find the most recent assignment overall to use as a fallback for guiaNumber
+        const lastAssignment = [...assignments]
+          .filter(asg => asg.tools.some(t => t.id === tool.id))
+          .sort((a, b) => new Date(b.checkoutDate).getTime() - new Date(a.checkoutDate).getTime())[0];
 
-        const lastProjectAssigned = completedWithTool.length > 0 ? completedWithTool[0].project.name : assignedProjectList;
+        const guiaDeRemision = lastAssignment?.guiaNumber || '';
 
-        // Get guia de remision: from the most recent active assignment for this tool
-        // If no active, try the most recent completed assignment
-        let guiaDeRemision = '';
-        if (activeAssignments.length > 0) {
-          // Sort by checkoutDate desc, take first
-          const lastActive = [...activeAssignments].sort(
-            (a, b) => new Date(b.checkoutDate).getTime() - new Date(a.checkoutDate).getTime()
-          )[0];
-          guiaDeRemision = lastActive.guiaNumber || '';
-        } else {
-          // No active assignment — look at completed ones that had this tool
-          const completedWithTool = assignments
-            .filter(asg => asg.status === 'completed' && asg.tools.some(t => t.id === tool.id))
-            .sort((a, b) => {
-              const aDate = a.checkinDate ? new Date(a.checkinDate).getTime() : 0;
-              const bDate = b.checkinDate ? new Date(b.checkinDate).getTime() : 0;
-              return bDate - aDate;
-            });
-          if (completedWithTool.length > 0) {
-            guiaDeRemision = completedWithTool[0].guiaNumber || '';
-          }
-        }
+        const lastProjectForStatus = (status: 'damaged' | 'lost' | 'missing') => {
+          const entry = completedAssignments.find(e => e.status === status);
+          return entry ? entry.projectName : (lastAssignment?.project.name || '');
+        };
 
         // Build extra information from non-standard custom attributes
         const standardKeys = standardAttributes.filter(attr => attr !== 'Custom');
-        // Keys that are already mapped to dedicated columns — exclude from Observaciones
-        const dedicatedKeys = new Set([
-          'Brand', 'Marca', 'brand', 'marca',
-          'Model', 'Modelo', 'model', 'modelo',
-          'Serial Number', 'Serie', 'serial_number', 'serie',
-        ]);
+        const dedicatedKeys = new Set(['Brand', 'Marca', 'brand', 'marca', 'Model', 'Modelo', 'model', 'modelo', 'Serial Number', 'Serie', 'serial_number', 'serie']);
         const extraInfo: string[] = [];
         Object.entries(tool.customAttributes).forEach(([key, value]) => {
           if (!standardKeys.includes(key) && !dedicatedKeys.has(key)) {
@@ -602,13 +602,7 @@ export default function ToolsManager() {
         });
         const observaciones = extraInfo.join(' | ');
 
-        // Helper to build a row with the required Spanish headers
-        const buildRow = (
-          status: string,
-          qty: number,
-          projectAssigned: string,
-          guia: string
-        ): Record<string, string | number> => ({
+        const buildRow = (status: string, qty: number, projectAssigned: string, guia: string): Record<string, string | number> => ({
           'Instrumento': tool.name,
           'Categoría': translateCategory(tool.category),
           'Marca': tool.customAttributes['Brand'] || tool.customAttributes['Marca'] || '',
@@ -629,78 +623,45 @@ export default function ToolsManager() {
 
         if (statusFilter === 'All') {
           let hasExported = false;
-
-          if (extTool.quantity !== undefined && extTool.quantity > 0) {
-            const displayStatus = (tool.status === 'Lost' || tool.status === 'Damaged' || tool.status === 'Cal. Due') ? tool.status : 'Available';
-            data.push(buildRow(displayStatus, extTool.quantity, '', ''));
+          if (availableQuantity > 0) {
+            data.push(buildRow('Available', availableQuantity, '', ''));
             hasExported = true;
           }
-          if (inUseTotal > 0) {
-            data.push(buildRow('In Use', inUseTotal, assignedProjectList, guiaDeRemision));
+          if (inUseQuantity > 0) {
+            data.push(buildRow('In Use', inUseQuantity, assignedProjectList, guiaDeRemision));
             hasExported = true;
           }
-
-          const damagedTotal = assignments.reduce((sum, asg) => {
-            if (asg.status !== 'completed' || !asg.toolConditions) return sum;
-            const cond = asg.toolConditions[tool.id];
-            if (!cond) return sum;
-            if (typeof cond === 'object') return sum + (Number((cond as ToolConditionMap).damaged) || 0);
-            return cond === 'damaged' ? sum + (asg.tools.find(t => t.id === tool.id)?.quantity || 1) : sum;
-          }, 0);
-          const lostTotal = assignments.reduce((sum, asg) => {
-            if (asg.status !== 'completed' || !asg.toolConditions) return sum;
-            const cond = asg.toolConditions[tool.id];
-            if (!cond) return sum;
-            if (typeof cond === 'object') return sum + (Number((cond as ToolConditionMap).lost) || 0);
-            return cond === 'lost' ? sum + (asg.tools.find(t => t.id === tool.id)?.quantity || 1) : sum;
-          }, 0);
-          const missingTotal = assignments.reduce((sum, asg) => {
-            if (asg.status !== 'completed' || !asg.toolConditions) return sum;
-            const cond = asg.toolConditions[tool.id];
-            if (!cond) return sum;
-            if (typeof cond === 'object') return sum + (Number((cond as ToolConditionMap).missing) || 0);
-            return cond === 'missing' ? sum + (asg.tools.find(t => t.id === tool.id)?.quantity || 1) : sum;
-          }, 0);
-
-          const damagedQty = damagedTotal > 0 ? damagedTotal : (extTool.damagedQuantity || 0);
-          const lostQty = lostTotal > 0 ? lostTotal : (extTool.lostQuantity || 0);
-          if (damagedQty > 0 && tool.status !== 'Damaged') { data.push(buildRow('Damaged', damagedQty, '', '')); hasExported = true; }
-          if (lostQty > 0 && tool.status !== 'Lost') { data.push(buildRow('Lost', lostQty, '', '')); hasExported = true; }
-          if (missingTotal > 0) { data.push(buildRow('Missing', missingTotal, lastProjectAssigned, guiaDeRemision)); hasExported = true; }
-
-          const isCalDue = (() => {
-            if (!tool.isCalibrable || !tool.calibrationDue) return false;
-            if (tool.status === 'Cal. Due') return true;
-            const dueDate = new Date(`${tool.calibrationDue}T00:00:00`);
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const thirtyDaysFromNow = new Date(today); thirtyDaysFromNow.setDate(today.getDate() + 30);
-            return dueDate <= thirtyDaysFromNow;
-          })();
-          if (isCalDue) {
-            const calQty = (extTool.quantity || 0) + inUseTotal;
-            data.push(buildRow('Cal. Due', calQty > 0 ? calQty : 1, assignedProjectList, guiaDeRemision));
+          if (damagedQuantity > 0) {
+            data.push(buildRow('Damaged', damagedQuantity, lastProjectForStatus('damaged'), guiaDeRemision));
+            hasExported = true;
+          }
+          if (lostQuantity > 0) {
+            data.push(buildRow('Lost', lostQuantity, lastProjectForStatus('lost'), guiaDeRemision));
+            hasExported = true;
+          }
+          if (missingQuantity > 0) {
+            data.push(buildRow('Missing', missingQuantity, lastProjectForStatus('missing'), guiaDeRemision));
             hasExported = true;
           }
 
-          if (!hasExported) {
-            data.push(buildRow(tool.status, extTool.quantity || 0, assignedProjectList, guiaDeRemision));
+          if (!hasExported && tool.quantity) {
+            data.push(buildRow(tool.status, tool.quantity, '', ''));
           }
         } else {
-          // Filtered view — single row per tool based on active filter
-          if (statusFilter === 'In Use') {
-            data.push(buildRow('In Use', inUseTotal || (extTool as { inUseQuantity?: number }).inUseQuantity || 0, assignedProjectList, guiaDeRemision));
-          } else if (statusFilter === 'Damaged') {
-            data.push(buildRow('Damaged', (extTool as { damagedQuantity?: number }).damagedQuantity || 0, '', ''));
-          } else if (statusFilter === 'Lost') {
-            data.push(buildRow('Lost', (extTool as { lostQuantity?: number }).lostQuantity || 0, '', ''));
-          } else if (statusFilter === 'Missing') {
-            data.push(buildRow('Missing', (extTool as { missingQuantity?: number }).missingQuantity || 0, lastProjectAssigned, guiaDeRemision));
-          } else if (statusFilter === 'Cal. Due') {
-            const calQty = (extTool.quantity || 0) + inUseTotal;
-            data.push(buildRow('Cal. Due', calQty > 0 ? calQty : 1, assignedProjectList, guiaDeRemision));
-          } else {
-            data.push(buildRow(tool.status, extTool.quantity || 1, assignedProjectList, guiaDeRemision));
-          }
+          const qty =
+            statusFilter === 'Available' ? availableQuantity :
+              statusFilter === 'In Use' ? inUseQuantity :
+                statusFilter === 'Damaged' ? damagedQuantity :
+                  statusFilter === 'Lost' ? lostQuantity :
+                    statusFilter === 'Missing' ? missingQuantity :
+                      tool.quantity;
+
+          const project =
+            statusFilter === 'In Use' ? assignedProjectList :
+              ['Damaged', 'Lost', 'Missing'].includes(statusFilter) ? lastProjectForStatus(statusFilter.toLowerCase() as 'damaged' | 'lost' | 'missing') :
+                '';
+
+          data.push(buildRow(statusFilter, qty || 0, project, guiaDeRemision));
         }
       });
 
@@ -969,71 +930,124 @@ export default function ToolsManager() {
                   {(() => {
                     const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
 
-                    if (statusFilter === 'All') {
-                      const showInUse = (extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0;
-                      return (
-                        <>
-                          {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{t(`tools.statusLabels.${statusKeyMap[tool.status]}`, { defaultValue: tool.status })}</Badge>}
-                          {(showInUse || tool.status === 'In Use') && renderInUseBadge(tool.id)}
-                        </>
+                    const badges: React.JSX.Element[] = [];
+
+                    if (extTool.availableQuantity && extTool.availableQuantity > 0) {
+                      badges.push(<Badge key="available" variant={getStatusBadgeVariant('Available')}>{`${t('tools.statusLabels.Available')}: ${extTool.availableQuantity}`}</Badge>);
+                    }
+
+                    if (extTool.inUseQuantity && extTool.inUseQuantity > 0) {
+                      badges.push(renderInUseBadge(tool.id));
+                    }
+
+                    const completedEntries = buildInUseEntries(tool.id).filter(e => e.status !== 'inUse');
+
+                    const damagedQty = extTool.damagedQuantity || 0;
+                    if (damagedQty > 0) {
+                      const damagedEntry = completedEntries.find(e => e.status === 'damaged');
+                      const tooltipContent = damagedEntry ? `${damagedEntry.projectName}: ${damagedEntry.qty}` : t('tools.noAssignmentData');
+                      badges.push(
+                        <Tooltip key="damaged">
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">
+                              <Badge variant={getStatusBadgeVariant('Damaged')}>{`${t('tools.statusLabels.Damaged')}: ${damagedQty}`}</Badge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{tooltipContent}</TooltipContent>
+                        </Tooltip>
                       );
                     }
 
-                    let displayStatus = tool.status;
+                    const lostQty = extTool.lostQuantity || 0;
+                    if (lostQty > 0) {
+                      const lostEntry = completedEntries.find(e => e.status === 'lost');
+                      const tooltipContent = lostEntry ? `${lostEntry.projectName}: ${lostEntry.qty}` : t('tools.noAssignmentData');
+                      badges.push(
+                        <Tooltip key="lost">
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">
+                              <Badge variant={getStatusBadgeVariant('Lost')}>{`${t('tools.statusLabels.Lost')}: ${lostQty}`}</Badge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{tooltipContent}</TooltipContent>
+                        </Tooltip>
+                      );
+                    }
 
-                    if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                    const missingQty = extTool.missingQuantity || 0;
+                    if (missingQty > 0 && !extTool.inUseQuantity) { // Only show if not already under 'In Use'
+                      const missingEntry = completedEntries.find(e => e.status === 'missing');
+                      const tooltipContent = missingEntry ? `${t('tools.lastSeen')}: ${missingEntry.projectName}` : t('tools.noAssignmentData');
+                      badges.push(
+                        <Tooltip key="missing">
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">
+                              <Badge variant="outline">{`${t('tools.statusLabels.Missing')}: ${missingQty}`}</Badge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{tooltipContent}</TooltipContent>
+                        </Tooltip>
+                      );
+                    }
+
+                    if (badges.length === 0) {
+                      badges.push(<Badge key="default" variant={getStatusBadgeVariant(tool.status)}>{t(`tools.statusLabels.${statusKeyMap[tool.status]}`, { defaultValue: tool.status })}</Badge>);
+                    }
+
+                    if (statusFilter === 'All') {
+                      return badges;
+                    }
+
+                    // Handle filtered views
+                    let displayStatus = tool.status;
+                    let displayQty: number | undefined = undefined;
+
+                    if (statusFilter === 'Damaged') {
                       displayStatus = 'Damaged';
-                    } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                      displayQty = extTool.damagedQuantity;
+                    } else if (statusFilter === 'Lost') {
                       displayStatus = 'Lost';
-                    } else if (statusFilter === 'Available' && extTool.availableQuantity && extTool.availableQuantity > 0) {
+                      displayQty = extTool.lostQuantity;
+                    } else if (statusFilter === 'Available') {
                       displayStatus = 'Available';
+                      displayQty = extTool.availableQuantity;
                     } else if (statusFilter === 'Missing') {
-                      displayStatus = 'In Use';
+                      displayStatus = 'Missing';
+                      displayQty = extTool.missingQuantity;
                     } else if (statusFilter === 'In Use') {
                       displayStatus = 'In Use';
+                      displayQty = extTool.inUseQuantity;
                     } else if (statusFilter === 'Cal. Due') {
                       displayStatus = 'Cal. Due';
                     }
 
-                    if (displayStatus === 'In Use') {
-                      return renderInUseBadge(tool.id);
-                    }
+                    const getBadgeForStatus = (status: string) => {
+                      const qty =
+                        status === 'Damaged' ? extTool.damagedQuantity :
+                          status === 'Lost' ? extTool.lostQuantity :
+                            status === 'Missing' ? extTool.missingQuantity :
+                              extTool.inUseQuantity;
 
-                    return <Badge variant={getStatusBadgeVariant(displayStatus)}>{t(`tools.statusLabels.${statusKeyMap[displayStatus]}`, { defaultValue: displayStatus })}</Badge>;
-                  })()}
-                  {/* Show quantity based on filter or if > 1 */}
-                  {(() => {
-                    const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
-                    let displayQty = extTool.quantity;
-                    let prefix = t('common.quantity');
+                      const entry = buildInUseEntries(tool.id).find(e => e.status === status.toLowerCase());
+                      const tooltipContent = entry ? `${t('tools.lastSeen')}: ${entry.projectName}` : t('tools.noAssignmentData');
 
-                    if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
-                      displayQty = extTool.damagedQuantity;
-                      prefix = t('common.quantity');
-                    } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
-                      displayQty = extTool.lostQuantity;
-                      prefix = t('common.quantity');
-                    } else if (statusFilter === 'In Use') {
-                      displayQty = extTool.inUseQuantity || 0;
-                      prefix = t('common.quantity');
-                    } else if (statusFilter === 'Available') {
-                      displayQty = extTool.availableQuantity || 0;
-                      prefix = t('common.quantity');
-                    } else if (statusFilter === 'Missing') {
-                      displayQty = extTool.missingQuantity || 0;
-                      prefix = t('common.quantity');
-                    } else if (statusFilter === 'All') {
-                      prefix = t('common.total');
-                    }
+                      const BadgeComponent = <Badge variant={getStatusBadgeVariant(status as Tool['status'])}>{t(`tools.statusLabels.${statusKeyMap[status]}`, { defaultValue: status })}: {qty}</Badge>;
 
-                    // Always show if filtering by Damaged, Lost, In Use, Missing, or Available and there is quantity
-                    if ((statusFilter === 'Damaged' || statusFilter === 'Lost' || statusFilter === 'Missing' || statusFilter === 'In Use' || statusFilter === 'Available') && displayQty !== undefined && displayQty > 0) {
-                      return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
-                    }
+                      if (status === 'In Use') return renderInUseBadge(tool.id);
 
-                    return displayQty !== undefined && displayQty !== null && displayQty > 1 ? (
-                      <Badge variant="outline">{prefix}: {displayQty}</Badge>
-                    ) : null;
+                      return (
+                        <Tooltip>
+                          <TooltipTrigger asChild><span className="cursor-help">{BadgeComponent}</span></TooltipTrigger>
+                          <TooltipContent>{tooltipContent}</TooltipContent>
+                        </Tooltip>
+                      );
+                    };
+
+                    const badge = ['Damaged', 'Lost', 'Missing', 'In Use'].includes(displayStatus)
+                      ? getBadgeForStatus(displayStatus)
+                      : <Badge variant={getStatusBadgeVariant(displayStatus as Tool['status'])}>{t(`tools.statusLabels.${statusKeyMap[displayStatus]}`, { defaultValue: displayStatus })}{displayQty ? `: ${displayQty}` : ''}</Badge>;
+
+                    return <>{badge}</>;
                   })()}
                 </div>
               </CardHeader>
@@ -1100,70 +1114,56 @@ export default function ToolsManager() {
                             const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
 
                             if (statusFilter === 'All') {
-                              const showInUse = (extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0;
-                              return (
-                                <>
-                                  {tool.status !== 'In Use' && <Badge variant={getStatusBadgeVariant(tool.status)}>{t(`tools.statusLabels.${statusKeyMap[tool.status]}`, { defaultValue: tool.status })}</Badge>}
-                                  {(showInUse || tool.status === 'In Use') && renderInUseBadge(tool.id)}
-                                </>
-                              );
+                              const badges: React.JSX.Element[] = [];
+                              if (extTool.availableQuantity && extTool.availableQuantity > 0) {
+                                badges.push(<Badge key="available" variant={getStatusBadgeVariant('Available')}>{`${t('tools.statusLabels.Available')}: ${extTool.availableQuantity}`}</Badge>);
+                              }
+                              if ((extTool.inUseQuantity || 0) > 0 || (extTool.missingQuantity || 0) > 0) {
+                                badges.push(renderInUseBadge(tool.id));
+                              }
+                              if (extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                                badges.push(<Badge key="damaged" variant={getStatusBadgeVariant('Damaged')}>{`${t('tools.statusLabels.Damaged')}: ${extTool.damagedQuantity}`}</Badge>);
+                              }
+                              if (extTool.lostQuantity && extTool.lostQuantity > 0) {
+                                badges.push(<Badge key="lost" variant={getStatusBadgeVariant('Lost')}>{`${t('tools.statusLabels.Lost')}: ${extTool.lostQuantity}`}</Badge>);
+                              }
+                              if (badges.length === 0) {
+                                badges.push(<Badge key="default" variant={getStatusBadgeVariant(tool.status)}>{t(`tools.statusLabels.${statusKeyMap[tool.status]}`, { defaultValue: tool.status })}</Badge>);
+                              }
+                              return badges;
                             }
 
                             let displayStatus = tool.status;
+                            let displayQty: number | undefined = undefined;
 
-                            if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
+                            if (statusFilter === 'Damaged') {
                               displayStatus = 'Damaged';
-                            } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
+                              displayQty = extTool.damagedQuantity;
+                            } else if (statusFilter === 'Lost') {
                               displayStatus = 'Lost';
-                            } else if (statusFilter === 'Available' && extTool.availableQuantity && extTool.availableQuantity > 0) {
+                              displayQty = extTool.lostQuantity;
+                            } else if (statusFilter === 'Available') {
                               displayStatus = 'Available';
+                              displayQty = extTool.availableQuantity;
                             } else if (statusFilter === 'Missing') {
                               displayStatus = 'In Use';
+                              displayQty = extTool.missingQuantity;
                             } else if (statusFilter === 'In Use') {
                               displayStatus = 'In Use';
+                              displayQty = extTool.inUseQuantity;
                             } else if (statusFilter === 'Cal. Due') {
                               displayStatus = 'Cal. Due';
                             }
 
-                            if (displayStatus === 'In Use') {
-                              return renderInUseBadge(tool.id);
-                            }
+                            const badge = displayStatus === 'In Use'
+                              ? renderInUseBadge(tool.id)
+                              : <Badge variant={getStatusBadgeVariant(displayStatus)}>{t(`tools.statusLabels.${statusKeyMap[displayStatus]}`, { defaultValue: displayStatus })}</Badge>;
 
-                            return <Badge variant={getStatusBadgeVariant(displayStatus)}>{t(`tools.statusLabels.${statusKeyMap[displayStatus]}`, { defaultValue: displayStatus })}</Badge>;
-                          })()}
-                          {/* Show quantity based on filter or if > 1 */}
-                          {(() => {
-                            const extTool = tool as ExtendedTool & { damagedQuantity?: number; lostQuantity?: number; inUseQuantity?: number; availableQuantity?: number; missingQuantity?: number };
-                            let displayQty = extTool.quantity;
-                            let prefix = t('common.quantity');
+                            const qtyBadge = displayQty && displayQty > 0
+                              ? <Badge variant="outline">{`${t('common.quantity')}: ${displayQty}`}</Badge>
+                              : null;
 
-                            if (statusFilter === 'Damaged' && extTool.damagedQuantity && extTool.damagedQuantity > 0) {
-                              displayQty = extTool.damagedQuantity;
-                              prefix = t('common.quantity');
-                            } else if (statusFilter === 'Lost' && extTool.lostQuantity && extTool.lostQuantity > 0) {
-                              displayQty = extTool.lostQuantity;
-                              prefix = t('common.quantity');
-                            } else if (statusFilter === 'In Use') {
-                              displayQty = extTool.inUseQuantity || 0;
-                              prefix = t('common.quantity');
-                            } else if (statusFilter === 'Available') {
-                              displayQty = extTool.availableQuantity || 0;
-                              prefix = t('common.quantity');
-                            } else if (statusFilter === 'Missing') {
-                              displayQty = extTool.missingQuantity || 0;
-                              prefix = t('common.quantity');
-                            } else if (statusFilter === 'All') {
-                              prefix = t('common.total');
-                            }
-
-                            // Always show if filtering by Damaged, Lost, In Use, Missing, or Available and there is quantity
-                            if ((statusFilter === 'Damaged' || statusFilter === 'Lost' || statusFilter === 'Missing' || statusFilter === 'In Use' || statusFilter === 'Available') && displayQty !== undefined && displayQty > 0) {
-                              return <Badge variant="outline">{prefix}: {displayQty}</Badge>;
-                            }
-
-                            return displayQty !== undefined && displayQty !== null && displayQty > 1 ? (
-                              <Badge variant="outline">{prefix}: {displayQty}</Badge>
-                            ) : null;
+                            return <>{badge}{qtyBadge}</>;
                           })()}
                         </div>
                       </div>

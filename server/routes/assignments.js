@@ -325,24 +325,34 @@ router.put('/:id/checkin', async (req, res) => {
         }
 
         // Re-evaluate tool status
-        const activeCountRow = await getQuery(
-          `SELECT COUNT(*) as cnt FROM assignment_tools at
+        const activeAssignments = await allQuery(
+          `SELECT at.quantity FROM assignment_tools at
            JOIN assignments a ON at.assignmentId = a.id
            WHERE at.toolId = ? AND a.status = 'active' AND a.id != ?`,
           [toolId, assignmentId]
         );
-        const activeCount = activeCountRow ? activeCountRow.cnt : 0;
+        const inUseCount = activeAssignments.reduce((sum, row) => sum + row.quantity, 0);
 
         const toolStats = await getQuery(`SELECT quantity, damagedQuantity, lostQuantity FROM tools WHERE id = ?`, [toolId]);
         const newCond = expandCondition(condition, restoreAmount);
-        const hasMissing = newCond.missing > 0;
+
+        const totalOwned = toolStats.quantity || 0;
+        const damagedCount = toolStats.damagedQuantity || 0;
+        const lostCount = toolStats.lostQuantity || 0;
+        const missingCount = newCond.missing || 0;
+
+        const availableCount = totalOwned - inUseCount - damagedCount - lostCount - missingCount;
+
         let finalStatus = 'Available';
-        if (activeCount > 0 || hasMissing) {
+        if (inUseCount > 0 || missingCount > 0) {
           finalStatus = 'In Use';
-        } else if (toolStats.quantity === 0 && toolStats.damagedQuantity > 0) {
-          finalStatus = 'Damaged';
-        } else if (toolStats.quantity === 0 && toolStats.lostQuantity > 0 && toolStats.damagedQuantity === 0) {
-          finalStatus = 'Lost';
+        } else if (availableCount <= 0) {
+          if (lostCount > 0) finalStatus = 'Lost';
+          else if (damagedCount > 0) finalStatus = 'Damaged';
+          else if (totalOwned === 0) finalStatus = 'In Use';
+          else if (lostCount > 0) finalStatus = 'Lost';
+          else if (damagedCount > 0) finalStatus = 'Damaged';
+          else finalStatus = 'Available';
         }
 
         await runQuery(`UPDATE tools SET status = ? WHERE id = ?`, [finalStatus, toolId]);
