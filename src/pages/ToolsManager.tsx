@@ -945,7 +945,6 @@ export default function ToolsManager() {
                     const damagedQty = extTool.damagedQuantity || 0;
                     if (damagedQty > 0) {
                       const damagedEntry = completedEntries.find(e => e.status === 'damaged');
-                      const tooltipContent = damagedEntry ? `${damagedEntry.projectName}: ${damagedEntry.qty}` : t('tools.noAssignmentData');
                       badges.push(
                         <Tooltip key="damaged">
                           <TooltipTrigger asChild>
@@ -953,7 +952,11 @@ export default function ToolsManager() {
                               <Badge variant={getStatusBadgeVariant('Damaged')}>{`${t('tools.statusLabels.Damaged')}: ${damagedQty}`}</Badge>
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>{tooltipContent}</TooltipContent>
+                          <TooltipContent>
+                            {damagedEntry
+                              ? <div className="text-sm"><strong>{damagedEntry.projectName}</strong>: {damagedEntry.qty}</div>
+                              : <p className="text-sm text-muted-foreground">{t('tools.noAssignmentData')}</p>}
+                          </TooltipContent>
                         </Tooltip>
                       );
                     }
@@ -961,7 +964,6 @@ export default function ToolsManager() {
                     const lostQty = extTool.lostQuantity || 0;
                     if (lostQty > 0) {
                       const lostEntry = completedEntries.find(e => e.status === 'lost');
-                      const tooltipContent = lostEntry ? `${lostEntry.projectName}: ${lostEntry.qty}` : t('tools.noAssignmentData');
                       badges.push(
                         <Tooltip key="lost">
                           <TooltipTrigger asChild>
@@ -969,7 +971,11 @@ export default function ToolsManager() {
                               <Badge variant={getStatusBadgeVariant('Lost')}>{`${t('tools.statusLabels.Lost')}: ${lostQty}`}</Badge>
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>{tooltipContent}</TooltipContent>
+                          <TooltipContent>
+                            {lostEntry
+                              ? <div className="text-sm"><strong>{lostEntry.projectName}</strong>: {lostEntry.qty}</div>
+                              : <p className="text-sm text-muted-foreground">{t('tools.noAssignmentData')}</p>}
+                          </TooltipContent>
                         </Tooltip>
                       );
                     }
@@ -977,7 +983,6 @@ export default function ToolsManager() {
                     const missingQty = extTool.missingQuantity || 0;
                     if (missingQty > 0 && !extTool.inUseQuantity) { // Only show if not already under 'In Use'
                       const missingEntry = completedEntries.find(e => e.status === 'missing');
-                      const tooltipContent = missingEntry ? `${t('tools.lastSeen')}: ${missingEntry.projectName}` : t('tools.noAssignmentData');
                       badges.push(
                         <Tooltip key="missing">
                           <TooltipTrigger asChild>
@@ -985,7 +990,11 @@ export default function ToolsManager() {
                               <Badge variant="outline">{`${t('tools.statusLabels.Missing')}: ${missingQty}`}</Badge>
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>{tooltipContent}</TooltipContent>
+                          <TooltipContent>
+                            {missingEntry
+                              ? <div className="text-sm"><strong>{missingEntry.projectName}</strong>: {missingEntry.qty}</div>
+                              : <p className="text-sm text-muted-foreground">{t('tools.noAssignmentData')}</p>}
+                          </TooltipContent>
                         </Tooltip>
                       );
                     }
@@ -1029,7 +1038,6 @@ export default function ToolsManager() {
                               extTool.inUseQuantity;
 
                       const entry = buildInUseEntries(tool.id).find(e => e.status === status.toLowerCase());
-                      const tooltipContent = entry ? `${t('tools.lastSeen')}: ${entry.projectName}` : t('tools.noAssignmentData');
 
                       const BadgeComponent = <Badge variant={getStatusBadgeVariant(status as Tool['status'])}>{t(`tools.statusLabels.${statusKeyMap[status]}`, { defaultValue: status })}: {qty}</Badge>;
 
@@ -1038,7 +1046,11 @@ export default function ToolsManager() {
                       return (
                         <Tooltip>
                           <TooltipTrigger asChild><span className="cursor-help">{BadgeComponent}</span></TooltipTrigger>
-                          <TooltipContent>{tooltipContent}</TooltipContent>
+                          <TooltipContent>
+                            {entry
+                              ? <div className="text-sm"><strong>{entry.projectName}</strong>: {entry.qty}</div>
+                              : <p className="text-sm text-muted-foreground">{t('tools.noAssignmentData')}</p>}
+                          </TooltipContent>
                         </Tooltip>
                       );
                     };
