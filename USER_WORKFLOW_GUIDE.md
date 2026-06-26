@@ -1,112 +1,112 @@
-# QTools User Workflow & Experience Guide
+# Guía de Flujo de Trabajo y Experiencia de Usuario de QTools
 
-This document outlines the step-by-step user experience (UX) movements for the core operations within QTools. It serves as a manual for users interacting with the system.
-
----
-
-## 1. Checking Out Tools (Checkout Wizard)
-
-**Scenario:** A worker needs to borrow tools for a specific project.
-
-**UX Movements:**
-1. **Navigate to Checkout:** Click on the **"Checkout"** link in the left sidebar or the "Checkout Tools" quick action on the Dashboard.
-2. **Step 1: Select Tools**
-   * *Action:* Use the search bar (Ctrl+F) to find tools by name or category.
-   * *Action:* Click on the tool cards to select them. The card will highlight with a primary color ring.
-   * *Action:* For bulk items, use the `+` and `-` buttons that appear on the card to adjust the required quantity.
-   * *Action:* Click **Next**.
-3. **Step 2: Select Worker**
-   * *Action:* Search for the worker by name or Employee ID.
-   * *Action:* Click the radio button or the worker's card to assign the tools to them.
-   * *Action:* Click **Next**.
-4. **Step 3: Select Project**
-   * *Action:* Search for the target project.
-   * *Action:* Select the project card.
-   * *Action:* Click **Next**.
-5. **Step 4: Review & Confirm**
-   * *Action:* Review the summary of selected tools, worker, and project.
-   * *Action:* (Optional) Adjust the checkout date and time if recording a past event.
-   * *Action:* (Optional) Enter a "Número de guía" (Guide Number) and any relevant checkout notes.
-   * *Action:* Click **Complete Checkout**.
-6. **Result:** A success toast appears, and you are automatically redirected to the Active Assignments page.
+Este documento detalla los movimientos paso a paso de la experiencia de usuario (UX) para las operaciones principales dentro de QTools. Sirve como un manual para los usuarios que interactúan con el sistema.
 
 ---
 
-## 2. Checking In Tools
+## 1. Despacho de Herramientas (Asistente de Despacho)
 
-**Scenario:** A worker is returning tools they previously checked out.
+**Escenario:** Un trabajador necesita retirar herramientas para un proyecto específico.
 
-**UX Movements:**
-1. **Navigate to Assignments:** Click on **"Assignments"** in the left sidebar.
-2. **Locate Assignment:** Find the active assignment in the list. You can quickly spot overdue assignments by their red warning badges.
-3. **Initiate Check-In:** Click the **"Check In"** button on the specific assignment card.
-4. **Review Tool Conditions (Modal Dialog):**
-   * *Action:* For each tool, you will see input fields for quantities under four categories: **Good**, **Missing**, **Damaged**, and **Lost**.
-   * *Action:* By default, all tools are marked as "Good". If a tool is returned damaged or is missing, adjust the numbers accordingly (e.g., change Good to 0, and Damaged to 1).
-   * *Validation:* The system ensures the total quantities match the number originally checked out. It will display a warning if the numbers don't add up.
-5. **Finalize Details:**
-   * *Action:* Confirm the Check-in Date and Time.
-   * *Action:* Add any Check-in Notes (e.g., "Drill battery won't hold charge").
-6. **Submit:** Click **Confirm Check-In**.
-7. **Result:** A success toast appears. The assignment moves to the "Completed" tab, and the tool statuses are updated in the inventory (e.g., "Available", "Damaged", or "Lost").
-
----
-
-## 3. Tool Creation & Management
-
-**Scenario:** The tool room manager receives a new tool and needs to add it to the system.
-
-**UX Movements:**
-1. **Navigate to Tools:** Click on **"Tools Manager"** in the left sidebar.
-2. **Initiate Creation:** Click the **"Add New Tool"** button in the top right.
-3. **Basic Information (Modal Dialog):**
-   * *Action:* Enter the **Tool Name** (e.g., "DeWalt Hammer Drill").
-   * *Action:* Select a **Category** from the dropdown.
-   * *Action:* Set the **Status** (default is Available).
-   * *Action:* Set the **Quantity** (if bulk item).
-4. **Calibration settings:**
-   * *Action:* If the tool requires calibration, check the **"Requires Calibration"** box.
-   * *Action:* Select the **Calibration Due Date** and input the **Certificate N°**.
-5. **Custom Attributes (Optional):**
-   * *Action:* Select an attribute type (Brand, Model, Serial Number) or choose "Custom".
-   * *Action:* Enter the value (e.g., "DCD996B").
-   * *Action:* Click the **`+`** button to add the attribute to the list. You can drag and drop to reorder these attributes.
-6. **Image Upload:**
-   * *Action:* In the right column, drag and drop an image file, click to browse, or paste an image URL to visually identify the tool.
-7. **Submit:** Click **Add Tool**.
-8. **Result:** The modal closes, a success toast appears, and the new tool is immediately visible in the grid/list.
+**Movimientos de UX:**
+1.  **Navegar a Despacho:** Haz clic en el enlace **"Despacho"** en la barra lateral izquierda o en la acción rápida "Despachar Herramientas" en el Inicio.
+2.  **Paso 1: Seleccionar Herramientas**
+    *   *Acción:* Usa la barra de búsqueda (Ctrl+F) para encontrar herramientas por nombre o categoría.
+    *   *Acción:* Haz clic en las tarjetas de las herramientas para seleccionarlas. La tarjeta se resaltará con un borde de color primario.
+    *   *Acción:* Para ítems a granel, usa los botones `+` y `-` que aparecen en la tarjeta para ajustar la cantidad requerida.
+    *   *Acción:* Haz clic en **Siguiente**.
+3.  **Paso 2: Seleccionar Trabajador**
+    *   *Acción:* Busca al trabajador por nombre o N° de Empleado.
+    *   *Acción:* Haz clic en el botón de radio o en la tarjeta del trabajador para asignarle las herramientas.
+    *   *Acción:* Haz clic en **Siguiente**.
+4.  **Paso 3: Seleccionar Proyecto**
+    *   *Acción:* Busca el proyecto de destino.
+    *   *Acción:* Selecciona la tarjeta del proyecto.
+    *   *Acción:* Haz clic en **Siguiente**.
+5.  **Paso 4: Revisar y Confirmar**
+    *   *Acción:* Revisa el resumen de las herramientas seleccionadas, el trabajador y el proyecto.
+    *   *Acción:* (Opcional) Ajusta la fecha y hora de despacho si estás registrando un evento pasado.
+    *   *Acción:* (Opcional) Ingresa un "Número de guía" y cualquier nota de despacho relevante.
+    *   *Acción:* Haz clic en **Confirmar Despacho**.
+6.  **Resultado:** Aparece una notificación de éxito y eres redirigido automáticamente a la página de Asignaciones Activas.
 
 ---
 
-## 4. Managing Workers & Projects
+## 2. Devolución de Herramientas
 
-**Scenario:** Adding a new hire to the system so they can check out tools.
+**Escenario:** Un trabajador está devolviendo herramientas que retiró previamente.
 
-**UX Movements:**
-1. **Navigate to Workers & Projects:** Click on **"Workers & Projects"** in the left sidebar.
-2. **Initiate Creation:** Make sure you are on the "Workers" tab, then click **"Add Worker"**.
-3. **Enter Details (Modal Dialog):**
-   * *Action:* Enter the **Worker Name**.
-   * *Action:* Enter their unique **Employee ID**.
-4. **Submit:** Click **Add Worker**.
-5. **Projects:** The process is identical for projects—switch to the "Projects" tab, click "Add Project", enter the name, and save.
+**Movimientos de UX:**
+1.  **Navegar a Asignaciones:** Haz clic en **"Asignaciones"** en la barra lateral izquierda.
+2.  **Localizar Asignación:** Encuentra la asignación activa en la lista. Puedes identificar rápidamente las asignaciones vencidas por sus insignias de advertencia rojas.
+3.  **Iniciar Devolución:** Haz clic en el botón **"Registrar Devolución"** en la tarjeta de la asignación específica.
+4.  **Revisar Condiciones de Herramientas (Diálogo Modal):**
+    *   *Acción:* Para cada herramienta, verás campos de entrada para cantidades en cuatro categorías: **Bueno**, **Faltante**, **Dañado** y **Perdido**.
+    *   *Acción:* Por defecto, todas las herramientas están marcadas como "Bueno". Si una herramienta se devuelve dañada o falta, ajusta los números correspondientemente (p. ej., cambia Bueno a 0 y Dañado a 1).
+    *   *Validación:* El sistema se asegura de que las cantidades totales coincidan con el número original despachado. Mostrará una advertencia si los números no cuadran.
+5.  **Finalizar Detalles:**
+    *   *Acción:* Confirma la Fecha y Hora de Devolución.
+    *   *Acción:* Agrega cualquier Nota de Devolución (p. ej., "La batería del taladro no retiene la carga").
+6.  **Enviar:** Haz clic en **Confirmar Devolución**.
+7.  **Resultado:** Aparece una notificación de éxito. La asignación se mueve a la pestaña "Completadas" y los estados de las herramientas se actualizan en el inventario (p. ej., "Disponible", "Dañado" o "Perdido").
+
+---
+
+## 3. Creación y Gestión de Herramientas
+
+**Escenario:** El encargado del pañol recibe una nueva herramienta y necesita agregarla al sistema.
+
+**Movimientos de UX:**
+1.  **Navegar a Herramientas:** Haz clic en **"Gestión de Herramientas"** en la barra lateral.
+2.  **Iniciar Creación:** Haz clic en el botón **"Agregar Herramienta"** en la esquina superior derecha.
+3.  **Información Básica (Diálogo Modal):**
+    *   *Acción:* Ingresa el **Nombre de la Herramienta** (p. ej., "Taladro Percutor DeWalt").
+    *   *Acción:* Selecciona una **Categoría** del menú desplegable.
+    *   *Acción:* Establece el **Estado** (por defecto es Disponible).
+    *   *Acción:* Establece la **Cantidad** (si es un ítem a granel).
+4.  **Configuración de Calibración:**
+    *   *Acción:* Si la herramienta requiere calibración, marca la casilla **"Requiere Calibración"**.
+    *   *Acción:* Selecciona la **Fecha de Vencimiento de Calibración** e ingresa el **N° de Certificado**.
+5.  **Atributos Personalizados (Opcional):**
+    *   *Acción:* Selecciona un tipo de atributo (Marca, Modelo, N° de Serie) o elige "Personalizado".
+    *   *Acción:* Ingresa el valor (p. ej., "DCD996B").
+    *   *Acción:* Haz clic en el botón **`+`** para agregar el atributo a la lista. Puedes arrastrar y soltar para reordenar estos atributos.
+6.  **Subir Imagen:**
+    *   *Acción:* En la columna derecha, arrastra y suelta un archivo de imagen, haz clic para buscar o pega una URL de imagen para identificar visualmente la herramienta.
+7.  **Enviar:** Haz clic en **Agregar Herramienta**.
+8.  **Resultado:** El diálogo se cierra, aparece una notificación de éxito y la nueva herramienta es visible inmediatamente en la vista de cuadrícula/lista.
 
 ---
 
-## 5. Generating & Exporting Reports
+## 4. Gestión de Personal y Proyectos
 
-**Scenario:** A supervisor needs to review tool activity for the past 30 days and share it with management.
+**Escenario:** Agregar un nuevo empleado al sistema para que pueda retirar herramientas.
 
-**UX Movements:**
-1. **Navigate to Reports:** Click on **"Reports"** in the left sidebar.
-2. **Adjust Filters:**
-   * *Action:* Click **"Advanced Filters"** to expand the date range options.
-   * *Action:* Select "Last 30 days" from the preset dropdown, or choose custom Start and End dates.
-   * *Result:* The charts, summary cards, and activity log table instantly update to reflect the chosen timeframe.
-3. **Exporting Data:**
-   * *Action:* Click **"Export Options"** in the top right.
-   * *Action:* Select **"Export PDF"** to generate a formatted visual report for printing or emailing.
-   * *Action:* Alternatively, to export the raw inventory data to Excel, navigate to the **Tools Manager** and click **"Export to Excel"**.
+**Movimientos de UX:**
+1.  **Navegar a Personal y Proyectos:** Haz clic en **"Personal y Proyectos"** en la barra lateral.
+2.  **Iniciar Creación:** Asegúrate de estar en la pestaña "Personal", luego haz clic en **"Agregar Personal"**.
+3.  **Ingresar Detalles (Diálogo Modal):**
+    *   *Acción:* Ingresa el **Nombre del Trabajador**.
+    *   *Acción:* Ingresa su **N° de Empleado** único.
+4.  **Enviar:** Haz clic en **Agregar Personal**.
+5.  **Proyectos:** El proceso es idéntico para los proyectos: cambia a la pestaña "Proyectos", haz clic en "Agregar Proyecto", ingresa el nombre y guarda.
 
 ---
-*Tip: Use the `Ctrl+F` shortcut anywhere in the app to instantly focus the main search bar for the page you are on.*
+
+## 5. Generación y Exportación de Reportes
+
+**Escenario:** Un supervisor necesita revisar la actividad de las herramientas de los últimos 30 días y compartirla con la gerencia.
+
+**Movimientos de UX:**
+1.  **Navegar a Reportes:** Haz clic en **"Reportes"** en la barra lateral.
+2.  **Ajustar Filtros:**
+    *   *Acción:* Haz clic en **"Filtros Avanzados"** para expandir las opciones de rango de fechas.
+    *   *Acción:* Selecciona "Últimos 30 días" del menú desplegable predefinido, o elige fechas de Inicio y Fin personalizadas.
+    *   *Resultado:* Los gráficos, las tarjetas de resumen y la tabla de registro de actividad se actualizan instantáneamente para reflejar el período de tiempo elegido.
+3.  **Exportar Datos:**
+    *   *Acción:* Haz clic en **"Opciones de Exportación"** en la esquina superior derecha.
+    *   *Acción:* Selecciona **"Exportar PDF"** para generar un reporte visual formateado para imprimir o enviar por correo electrónico.
+    *   *Acción:* Alternativamente, para exportar los datos brutos del inventario a Excel, navega a **Gestión de Herramientas** y haz clic en **"Exportar a Excel"**.
+
+---
+*Consejo: Usa el atajo `Ctrl+F` en cualquier parte de la aplicación para enfocar instantáneamente la barra de búsqueda principal de la página en la que te encuentras.*

@@ -1,188 +1,189 @@
-# QTools - Professional Tool Room Management System
+# QTools - Sistema Profesional de Gestión de Pañol de Herramientas
 
 <p align="center">
   <img src="public/logo.png" alt="QTools Logo" width="150"/>
 </p>
 
 <p align="center">
-  <strong>Streamline your tool room operations with real-time tracking, automated workflows, and comprehensive reporting.</strong>
+  <strong>Optimiza las operaciones de herramientas con seguimiento en tiempo real, flujos de trabajo automatizados y reportes completos.</strong>
 </p>
 
 ---
 
-## 🎯 Executive Summary
+## Resumen Ejecutivo
 
-QTools is a **production-ready tool inventory management system** designed to eliminate tool loss, reduce downtime, and improve operational efficiency in industrial environments. Built with modern web technologies, it provides real-time visibility into tool locations, usage patterns, and maintenance schedules.
+QTools es un **sistema de gestión de inventario de herramientas listo para producción**, diseñado para eliminar la pérdida de herramientas, reducir el tiempo de inactividad y mejorar la eficiencia operativa en entornos industriales. Construido con tecnologías web modernas, proporciona visibilidad en tiempo real de la ubicación de las herramientas, patrones de uso y calendarios de mantenimiento.
 
-### 💼 Business Value
-- **📉 Reduce Tool Loss:** Track every tool from checkout to return
-- **⏱️ Minimize Downtime:** Instant visibility of tool availability and location
-- **📊 Data-Driven Decisions:** Comprehensive reporting and analytics
-- **🔄 Streamlined Workflows:** Automated checkout/check-in processes
-- **📱 Multi-Device Access:** Works on phones, tablets, and computers
-- **🔒 Secure & Reliable:** Local network deployment with HTTPS encryption
-
----
-
-## ✨ Core Features
-
-### 🏠 **Real-Time Dashboard**
-- Instant overview of tool inventory status
-- Calibration alerts and maintenance reminders
-- Key performance metrics and trends
-- Quick access to critical operations
-
-### 🔧 **Complete Tool Management**
-- Digital tool catalog with photos and specifications
-- **Flexible View Options:** Switch between grid and list views with customizable column density (2, 3, or 4 columns)
-- **Advanced Sorting:** Click table headers to sort by name, category, or status with visual feedback
-- Custom attributes for detailed tracking (serial numbers, purchase dates, etc.)
-- Status tracking (Available, In Use, Damaged, Lost, Calibration Due)
-- Maintenance and calibration scheduling
-
-### 👥 **Workforce & Project Integration**
-- Worker profiles with assignment history and generic user icons for visual consistency
-- Project-based tool allocation with folder icons for easy identification
-- **Intuitive Table Sorting:** Click column headers to sort workers and projects
-- Performance tracking and accountability
-- Workload distribution analysis
-
-### 📋 **Smart Checkout System**
-- 4-step guided checkout process
-- Barcode/QR code ready (future enhancement)
-- Automatic status updates
-- Error prevention and validation
-
-### 📊 **Advanced Reporting**
-- Activity logs and audit trails
-- Inventory status by category
-- Usage patterns and trends
-- Export capabilities for external analysis
-- Calibration and maintenance reports
-
-### 🌐 **Network-Ready Architecture**
-- Access from any device on your network
-- Real-time synchronization across all users
-- Secure HTTPS communication
-- Offline-capable with automatic sync
+### Valor para el Negocio
+- **Reduce la Pérdida de Herramientas:** Rastrea cada herramienta desde su salida hasta su devolución.
+- **Minimiza el Tiempo de Inactividad:** Visibilidad instantánea de la disponibilidad y ubicación de las herramientas.
+- **Decisiones Basadas en Datos:** Reportes y análisis completos.
+- **Flujos de Trabajo Optimizados:** Procesos automatizados de salida y entrada.
+- **Acceso Multi-dispositivo:** Funciona en celulares, tabletas y computadoras.
+- **Seguro y Confiable:** Despliegue en red local con encriptación HTTPS.
 
 ---
 
-## 🚀 Quick Start Guide
+## Características Principales
 
-### For IT/Setup Personnel
+### **Panel de Control en Tiempo Real**
+- Vista general instantánea del estado del inventario de herramientas.
+- Alertas de calibración y recordatorios de mantenimiento.
+- Métricas clave de rendimiento y tendencias.
+- Acceso rápido a operaciones críticas.
+
+### **Gestión Completa de Herramientas**
+- Catálogo digital de herramientas con fotos y especificaciones.
+- **Opciones de Vista Flexibles:** Cambia entre vista de cuadrícula y lista con densidad de columnas personalizable (2, 3 o 4 columnas).
+- **Ordenamiento Avanzado:** Haz clic en los encabezados de las tablas para ordenar por nombre, categoría o estado con retroalimentación visual.
+- Atributos personalizados para un seguimiento detallado (números de serie, fechas de compra, etc.).
+- Seguimiento de estado (Disponible, En Uso, Dañado, Perdido, Requiere Calibración).
+- Programación de mantenimiento y calibración.
+
+### **Integración de Personal y Proyectos**
+- Perfiles de trabajador con historial de asignaciones e íconos de usuario genéricos para consistencia visual.
+- Asignación de herramientas por proyecto con íconos de carpeta para fácil identificación.
+- **Ordenamiento Intuitivo de Tablas:** Haz clic en los encabezados de las columnas para ordenar trabajadores y proyectos.
+- Seguimiento del rendimiento y responsabilidades.
+- Análisis de la distribución de la carga de trabajo.
+
+### **Sistema de Despacho Inteligente**
+- Proceso de despacho guiado en 4 pasos.
+- Listo para códigos de barras/QR (mejora futura).
+- Actualizaciones automáticas de estado.
+- Prevención de errores y validación.
+
+### **Reportes Avanzados**
+- Registros de actividad y auditorías.
+- Estado del inventario por categoría.
+- Patrones y tendencias de uso.
+- Capacidades de exportación para análisis externo.
+- Reportes de calibración y mantenimiento.
+
+### **Arquitectura Lista para la Red**
+- Acceso desde cualquier dispositivo en tu red.
+- Sincronización en tiempo real entre todos los usuarios.
+- Comunicación segura con HTTPS.
+- Capacidad de funcionar sin conexión con sincronización automática.
+
+---
+
+## Guía de Inicio Rápido
+
+### Para Personal de TI/Instalación
 
 1. **Install Prerequisites:**
    - Download and install [Node.js](https://nodejs.org/) (v18 or later)
 
 2. **Setup Application:**
+2. **Configurar la Aplicación:**
    ```bash
-   # Clone and setup
-   git clone <repository-url>
+   # Clonar y configurar
+   git clone <url-del-repositorio>
    cd QTools
    npm install
    
-   # Setup SSL certificates (one-time)
-   npm run setup-certs
+   # Configurar certificados SSL (una sola vez)
+   npm run setup-certs # En Windows, puede que necesites ejecutar esto como administrador
    
-   # Start the system
+   # Iniciar el sistema
    npm start
    ```
 
-3. **Network Access:**
-   - **Local:** `https://localhost:8082`
-   - **Network:** `https://[server-ip]:8082`
-   - Share the network URL with all users
+3. **Acceso en la Red:**
+   - **Localmente:** `https://localhost:8082`
+   - **En la red:** `https://[ip-del-servidor]:8082`
+   - Comparte la URL de la red con todos los usuarios.
 
-### For End Users
-- Simply navigate to the provided URL on any device
-- No installation required - works in any modern web browser
-- Accept the security certificate when prompted (one-time)
-
----
-
-## 📱 Multi-Device Support
-
-QTools works seamlessly across all devices:
-
-- **🖥️ Desktop Computers:** Full feature access with large screen optimization
-- **📱 Mobile Phones:** Touch-optimized interface for field use
-- **📟 Tablets:** Perfect for tool room kiosks and mobile workstations
-- **💻 Laptops:** Ideal for supervisors and managers
+### Para Usuarios Finales
+- Simplemente navega a la URL proporcionada en cualquier dispositivo.
+- No se requiere instalación, funciona en cualquier navegador web moderno.
+- Acepta el certificado de seguridad cuando se te solicite (una sola vez).
 
 ---
 
-## 🔐 Security & Reliability
+## Soporte Multi-dispositivo
 
-- **🔒 HTTPS Encryption:** All data transmission is encrypted
-- **🏠 Local Network Only:** No internet connection required
-- **💾 Automatic Backups:** Database automatically saves all changes
-- **🔄 Real-Time Sync:** All devices see updates immediately
-- **📊 Audit Trail:** Complete history of all actions
+QTools funciona sin problemas en todos los dispositivos:
 
----
-
-## 📈 Implementation Roadmap
-
-### ✅ **Phase 1: Core System (Current)**
-- Tool inventory management
-- Worker and project tracking
-- Basic checkout/check-in workflow
-- Reporting and analytics
-- Multi-device access
-
-### 🔄 **Phase 2: Enhanced Features (Planned)**
-- User authentication and role-based permissions
-- Barcode/QR code scanning
-- Advanced reporting and dashboards
-- Mobile app development
-- Integration with existing systems
-
-### 🚀 **Phase 3: Enterprise Features (Future)**
-- Cloud deployment options
-- API integrations
-- Advanced analytics and AI insights
-- Maintenance scheduling automation
-- Supply chain integration
+- **Computadoras de Escritorio:** Acceso a todas las funciones con optimización para pantallas grandes.
+- **Celulares:** Interfaz optimizada para uso en campo.
+- **Tabletas:** Perfectas para quioscos en el pañol y estaciones de trabajo móviles.
+- **Laptops:** Ideales para supervisores y gerentes.
 
 ---
 
-## 💡 Why QTools?
+## Seguridad y Confiabilidad
 
-### **Current Challenges Solved:**
-- ❌ **Tool Loss:** "Where is that expensive torque wrench?"
-- ❌ **Downtime:** "Who has the multimeter I need?"
-- ❌ **Paperwork:** Manual logs and spreadsheets
-- ❌ **Accountability:** "Who was the last person to use this?"
-- ❌ **Maintenance:** Missed calibration dates
-
-### **QTools Solutions:**
-- ✅ **Real-Time Tracking:** Know exactly where every tool is
-- ✅ **Instant Availability:** See what's available before walking to the tool room
-- ✅ **Digital Records:** Automatic logging and history
-- ✅ **Full Accountability:** Complete audit trail of all activities
-- ✅ **Proactive Maintenance:** Automated calibration reminders
+- **Encriptación HTTPS:** Toda la transmisión de datos está encriptada.
+- **Solo Red Local:** No se requiere conexión a internet.
+- **Copias de Seguridad Automáticas:** La base de datos guarda todos los cambios automáticamente.
+- **Sincronización en Tiempo Real:** Todos los dispositivos ven las actualizaciones de inmediato.
+- **Registro de Auditoría:** Historial completo de todas las acciones.
 
 ---
 
-## 📞 Support & Training
+## Hoja de Ruta
 
-- **🗺️ Workflow Guide:** [User Workflow Guide](USER_WORKFLOW_GUIDE.md) for step-by-step UX movements
-- **📖 User Guide:** Comprehensive guide for daily operations
-- **🎥 Training Materials:** Step-by-step tutorials (coming soon)
-- **🔧 Technical Support:** IT deployment and troubleshooting guide
-- **📊 Best Practices:** Recommended workflows and procedures
+### **Fase 1: Sistema Central (Actual)**
+- Gestión de inventario de herramientas.
+- Seguimiento de trabajadores y proyectos.
+- Flujo básico de despacho y devolución.
+- Reportes y análisis.
+- Acceso multi-dispositivo.
+
+### **Fase 2: Funcionalidades Mejoradas (Planeado)**
+- Autenticación de usuarios y permisos basados en roles.
+- Escaneo de códigos de barras/QR.
+- Reportes y paneles de control avanzados.
+- Desarrollo de aplicación móvil.
+- Integración con sistemas existentes.
+
+### **Fase 3: Funcionalidades Empresariales (Futuro)**
+- Opciones de despliegue en la nube.
+- Integraciones vía API.
+- Análisis avanzado e insights con IA.
+- Automatización de la programación de mantenimiento.
+- Integración con la cadena de suministro.
 
 ---
 
-## 🎯 Next Steps
+## ¿Por qué QTools?
 
-1. **Review the system** with your team
-2. **Schedule a demonstration** for key stakeholders
-3. **Plan the deployment** timeline
-4. **Identify pilot users** for initial rollout
-5. **Prepare training materials** for your specific workflows
+### **Desafíos Actuales que Resuelve:**
+-  **Pérdida de Herramientas:** "¿Dónde está ese torquímetro tan caro?"
+-  **Tiempo de Inactividad:** "¿Quién tiene el multímetro que necesito?"
+-  **Papeleo:** Registros manuales y hojas de cálculo.
+-  **Rendición de Cuentas:** "¿Quién fue la última persona en usar esto?"
+-  **Mantenimiento:** Fechas de calibración vencidas.
+
+### **Soluciones de QTools:**
+- **Seguimiento en Tiempo Real:** Sabe exactamente dónde está cada herramienta.
+- **Disponibilidad Instantánea:** Ve qué está disponible antes de ir al pañol.
+- **Registros Digitales:** Registro e historial automáticos.
+- **Responsabilidad Total:** Registro de auditoría completo de todas las actividades.
+- **Mantenimiento Proactivo:** Recordatorios automáticos de calibración.
 
 ---
 
-**QTools transforms your tool room from a cost center into a strategic asset, providing the visibility and control needed for modern industrial operations.**
+## Soporte y Capacitación
+
+- **Guía de Flujo de Trabajo:** Guía de Flujo de Trabajo del Usuario para movimientos paso a paso en la UX.
+- **Guía de Usuario:** Guía completa para operaciones diarias.
+- **Materiales de Capacitación:** Tutoriales paso a paso (próximamente).
+- **Soporte Técnico:** Guía de despliegue y solución de problemas para TI.
+- **Mejores Prácticas:** Flujos de trabajo y procedimientos recomendados.
+
+---
+
+## Próximos Pasos
+
+1. **Revisar el sistema** con tu equipo.
+2. **Programar una demostración** para los interesados clave.
+3. **Planificar el cronograma** de despliegue.
+4. **Identificar usuarios piloto** para el lanzamiento inicial.
+5. **Preparar materiales de capacitación** para tus flujos de trabajo específicos.
+
+---
+
+**QTools transforma tu almacén de herramientas de un centro de costos a un activo estratégico, proporcionando la visibilidad y el control necesarios para las operaciones industriales modernas.**
