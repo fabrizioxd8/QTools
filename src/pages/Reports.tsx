@@ -19,7 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   ResponsiveContainer,
-  LineChart,
+  ComposedChart,
+  Bar,
   Line,
   XAxis,
   YAxis,
@@ -247,18 +248,22 @@ export default function Reports() {
     conditionPairs: Array<{ cond: string; qty: number }>;
     action: 'Checkout' | 'Check-in';
   }) => {
-    // Build status string from conditionPairs
+    // Translate each condition label using the same i18n keys the UI table uses
     const statusStr = item.conditionPairs.length > 0
       ? item.conditionPairs
-        .map(({ cond, qty }) => `${cond.charAt(0).toUpperCase() + cond.slice(1)}: ${qty}`)
+        .map(({ cond, qty }) => {
+          const key = `assignments.condition${cond.charAt(0).toUpperCase() + cond.slice(1)}`;
+          const label = t(key, { defaultValue: cond.charAt(0).toUpperCase() + cond.slice(1) });
+          return `${label}: ${qty}`;
+        })
         .join(', ')
-      : 'Good';
+      : t('assignments.conditionGood');
 
     const detailLines = [
       item.brand ? `Brand: ${item.brand}` : undefined,
       item.model ? `Model: ${item.model}` : undefined,
       item.serie ? `Serie: ${item.serie}` : undefined,
-      `<strong>Status: ${statusStr}</strong>`,
+      `<strong>${t('common.status')}: ${statusStr}</strong>`,
       ...Object.entries(item.extraDetails).map(([key, value]) => `${key}: ${value}`),
     ].filter(Boolean);
 
@@ -294,17 +299,49 @@ export default function Reports() {
     return empty;
   }, [filteredActivityLog, dayLabels]);
 
-  const brandPrimary = 'rgb(18,161,154)';
-  const brandLighter = 'rgba(18,161,154,0.42)';
-  const brandAccent = '#0f766e';
+  const brandPrimary = '#12a19a';
+  const brandReturn = '#0f766e';
+  const brandAccent = '#64748b';
 
   const chartValues = [
     { label: t('reports.toolsCheckedOut'), value: toolsCheckedOut, color: brandPrimary },
-    { label: t('reports.toolsReturned'), value: toolsReturned, color: brandLighter },
+    { label: t('reports.toolsReturned'), value: toolsReturned, color: brandReturn },
     { label: t('reports.currentlyActive'), value: currentlyActive, color: brandAccent },
   ];
   const totalChart = chartValues.reduce((sum, item) => sum + item.value, 0) || 1;
-  const maxDaily = Math.max(...dailyMovements.slice(0, 6).map(day => day.checkedOut + day.checkedIn), 1);
+
+  // ── Utilization chart: checkout vs return per date + derived KPIs ────────
+  const utilizationData = useMemo(() => {
+    // 1. Bucket by calendar date (chronological order)
+    const orderedKeys: string[] = [];
+    const map = new Map<string, { checkedOut: number; checkedIn: number; dateObj: Date }>();
+
+    // Sort entries chronologically before processing
+    const sorted = [...filteredActivityLog].sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+    sorted.forEach(item => {
+      const key = item.dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      if (!map.has(key)) {
+        orderedKeys.push(key);
+        map.set(key, { checkedOut: 0, checkedIn: 0, dateObj: item.dateObj });
+      }
+      const bucket = map.get(key)!;
+      if (item.action === 'Checkout') bucket.checkedOut += item.quantity;
+      else bucket.checkedIn += item.quantity;
+    });
+
+    // 2. Add Net Movement and Cumulative Open per day
+    let runningOpen = 0;
+    const rows = orderedKeys.map(key => {
+      const { checkedOut, checkedIn } = map.get(key)!;
+      const net = checkedOut - checkedIn;        // + = more went out; - = more came back
+      runningOpen = Math.max(0, runningOpen + net);
+      return { name: key, checkedOut, checkedIn, net, cumulativeOpen: runningOpen };
+    });
+
+    // Cap at 14 most-recent points for readability
+    return rows.slice(-14);
+  }, [filteredActivityLog]);
 
   const handleExportPDF = () => {
     const summaryRows = [
@@ -323,29 +360,31 @@ export default function Reports() {
       quantity: String(item.quantity),
     }));
 
-    const barRows = dailyMovements.slice(0, 6).map((day, index) => ({
-      label: dayLabels[index],
-      checkedOut: day.checkedOut,
-      checkedIn: day.checkedIn,
+    const barRows = utilizationData.map(d => ({
+      label: d.name,
+      checkedOut: d.checkedOut,
+      checkedIn: d.checkedIn,
+      net: d.net,
+      cumulativeOpen: d.cumulativeOpen,
     }));
-
+    const maxDaily = Math.max(...barRows.map(r => Math.max(r.checkedOut, r.checkedIn)), 1);
     const piePercentages = chartValues.map(item => ({
       ...item,
       percentage: Math.round((item.value / totalChart) * 100),
     }));
 
-    const trendPoints = dailyMovements.slice(0, 6)
-      .map((day, index) => {
-        const y = 120 - Math.round(((day.checkedOut + day.checkedIn) / maxDaily) * 100);
-        return `${50 + index * 120},${y}`;
-      })
-      .join(' ');
+    const brandPdf = '#12a19a';   // checkout – teal
+    const brandReturnPdf = '#0f766e';   // return – dark teal
+    const brandActivePdf = '#64748b';   // active – slate
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error(t('reports.exportWindowError'));
       return;
     }
+
+    // Assign onload BEFORE document.write so it fires reliably
+    printWindow.onload = () => { printWindow.print(); };
 
     const html = `
       <!doctype html>
@@ -359,35 +398,31 @@ export default function Reports() {
             .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; }
             .header-copy { max-width: 75%; }
             .logo { width: 120px; height: auto; }
-            h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -0.03em; color: ${brandPrimary}; }
+            h1 { font-size: 34px; margin: 0 0 6px; letter-spacing: -0.03em; color: ${brandPdf}; }
             .subtitle { margin: 0; font-size: 16px; color: #475569; }
             .section { margin-bottom: 28px; }
-            .section-title { font-size: 18px; font-weight: 700; color: ${brandPrimary}; margin-bottom: 14px; border-bottom: 1px solid #dbeafe; padding-bottom: 8px; }
+            .section-title { font-size: 18px; font-weight: 700; color: ${brandPdf}; margin-bottom: 14px; border-bottom: 1px solid #dbeafe; padding-bottom: 8px; }
             .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
             .summary-card { background: #ecfdf5; border: 1px solid #c7f0ea; border-radius: 12px; padding: 16px; }
-            .summary-number { font-size: 24px; font-weight: 700; color: ${brandAccent}; margin-bottom: 6px; }
+            .summary-number { font-size: 24px; font-weight: 700; color: ${brandReturnPdf}; margin-bottom: 6px; }
             .summary-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; }
             table { width: 100%; border-collapse: collapse; }
             th, td { padding: 14px 12px; border: 1px solid #e2e8f0; }
-            th { background: #effafa; color: ${brandAccent}; font-weight: 700; font-size: 13px; }
+            th { background: #effafa; color: ${brandReturnPdf}; font-weight: 700; font-size: 13px; }
             td { color: #334155; font-size: 13px; vertical-align: top; }
             tbody tr:nth-child(even) td { background: #f8fbfb; }
             .tool-details { line-height: 1.45; }
             .status-list { margin: 0; padding-left: 18px; color: #334155; }
-            .chart-row { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; margin-top: 16px; }
+            .chart-row { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; margin-top: 16px; }
             .bar-track { position: relative; width: 100%; height: 12px; background: #e2f5f1; border-radius: 999px; overflow: hidden; }
             .bar-fill { height: 100%; border-radius: 999px; }
             .bar-label { font-size: 12px; color: #475569; min-width: 42px; }
             .bar-stats { display: flex; justify-content: space-between; font-size: 11px; color: #475569; margin-top: 6px; }
             .pie-card { padding: 16px; border: 1px solid #d8f0ed; border-radius: 16px; background: #f8fdfc; }
-            .pie-chart { width: 180px; height: 180px; margin: 0 auto 14px; border-radius: 50%; background: conic-gradient(${brandPrimary} 0% ${Math.max(1, Math.round((toolsCheckedOut / totalChart) * 100))}%, ${brandLighter} ${Math.max(1, Math.round((toolsCheckedOut / totalChart) * 100))}% ${Math.max(1, Math.round(((toolsCheckedOut + toolsReturned) / totalChart) * 100))}%, ${brandAccent} ${Math.max(1, Math.round(((toolsCheckedOut + toolsReturned) / totalChart) * 100))}% 100%); }
+            .pie-chart { width: 180px; height: 180px; margin: 0 auto 14px; border-radius: 50%; background: conic-gradient(${brandPdf} 0% ${Math.max(1, Math.round((toolsCheckedOut / totalChart) * 100))}%, ${brandReturnPdf} ${Math.max(1, Math.round((toolsCheckedOut / totalChart) * 100))}% ${Math.max(1, Math.round(((toolsCheckedOut + toolsReturned) / totalChart) * 100))}%, ${brandActivePdf} ${Math.max(1, Math.round(((toolsCheckedOut + toolsReturned) / totalChart) * 100))}% 100%); }
             .pie-legend { display: grid; gap: 10px; }
             .legend-item { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #475569; }
             .legend-swatch { width: 12px; height: 12px; border-radius: 3px; }
-            .trend-card { margin-top: 24px; }
-            .trend-chart { width: 100%; height: 160px; }
-            .trend-line { fill: none; stroke: ${brandAccent}; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
-            .trend-marker { fill: ${brandPrimary}; }
           </style>
         </head>
         <body>
@@ -409,7 +444,7 @@ export default function Reports() {
                     <th>${t("reports.action")}</th>
                     <th>${t("reports.worker")}</th>
                     <th>${t("reports.project")}</th>
-                    <th>${t('reports.tool') /* tool details */}</th>
+                    <th>${t('reports.tool')}</th>
                     <th>${t('common.quantity')}</th>
                   </tr>
                 </thead>
@@ -450,21 +485,25 @@ export default function Reports() {
             </section>
 
             <section class="section">
-              <div class="section-title">${t('reports.weeklyMovements')}</div>
+              <div class="section-title">${t('reports.utilizationRate')}</div>
               <div class="chart-row">
                 <div>
-                  <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:12px;">${t('reports.weeklyMovements')}</div>
                   ${barRows.map(row => `
-                    <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:16px;">
+                    <div style="display:flex; align-items:flex-start; gap:12px; margin-bottom:14px;">
                       <div class="bar-label">${row.label}</div>
                       <div style="flex:1;">
                         <div class="bar-track">
-                          <div class="bar-fill" style="width:${Math.round((row.checkedOut / maxDaily) * 100)}%; background:${brandPrimary};"></div>
+                          <div class="bar-fill" style="width:${Math.round((row.checkedOut / maxDaily) * 100)}%; background:${brandPdf};"></div>
                         </div>
-                        <div class="bar-track" style="margin-top:8px; background:#dbf6f3;">
-                          <div class="bar-fill" style="width:${Math.round((row.checkedIn / maxDaily) * 100)}%; background:${brandLighter};"></div>
+                        <div class="bar-track" style="margin-top:6px; background:#d1f5f0;">
+                          <div class="bar-fill" style="width:${Math.round((row.checkedIn / maxDaily) * 100)}%; background:${brandReturnPdf};"></div>
                         </div>
-                        <div class="bar-stats"><span>${t('assignments.out')} ${row.checkedOut}</span><span>${t('assignments.in')} ${row.checkedIn}</span></div>
+                        <div class="bar-stats">
+                          <span>${t('reports.toolsCheckedOut')}: ${row.checkedOut}</span>
+                          <span>${t('reports.toolsReturned')}: ${row.checkedIn}</span>
+                          <span style="font-weight:600; color:${row.net > 0 ? '#0369a1' : row.net < 0 ? '#16a34a' : '#475569'};">${t('reports.netMovement')}: ${row.net > 0 ? '+' + row.net : row.net}</span>
+                          <span style="font-weight:600; color:#d97706;">${t('reports.cumulativeOpen')}: ${row.cumulativeOpen}</span>
+                        </div>
                       </div>
                     </div>
                   `).join('')}
@@ -474,26 +513,12 @@ export default function Reports() {
                   <div class="pie-chart"></div>
                   <div class="pie-legend">
                     ${piePercentages.map(item => `
-                      <div class="legend-item"><span class="legend-swatch" style="background:${item.color};"></span>${item.label} — ${item.value}</div>
+                      <div class="legend-item">
+                        <span class="legend-swatch" style="background:${item.color};"></span>
+                        ${item.label} — ${item.value}
+                      </div>
                     `).join('')}
                   </div>
-                </div>
-              </div>
-              <div class="trend-card">
-                <div style="font-size:14px; font-weight:600; color:#0f172a; margin-bottom:10px;">${t('reports.weeklyTrend')}</div>
-                <svg class="trend-chart" viewBox="0 0 700 160" preserveAspectRatio="none">
-                  <polyline class="trend-line" points="${trendPoints}" />
-                  ${dailyMovements.slice(0, 6).map((day, index) => {
-      const x = 50 + index * 120;
-      const y = 120 - Math.round(((day.checkedOut + day.checkedIn) / maxDaily) * 100);
-      return '<circle class="trend-marker" cx="' + x + '" cy="' + y + '" r="5"/>';
-    }).join('')}
-                </svg>
-                <div style="position:relative; width:100%; height:20px; margin-top:8px; font-size:11px; color:#64748b;">
-                  ${dayLabels.map((label, index) => {
-      const leftPercent = ((50 + index * 120) / 700) * 100;
-      return `<div style="position:absolute; left:${leftPercent}%; transform:translateX(-50%);">${label}</div>`;
-    }).join('')}
                 </div>
               </div>
             </section>
@@ -505,9 +530,6 @@ export default function Reports() {
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
 
     toast.success(t('reports.pdfGenerated'));
   };
@@ -697,21 +719,36 @@ export default function Reports() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>{t("reports.weeklyTrend")}</CardTitle>
+            <CardTitle>{t('reports.utilizationRate')}</CardTitle>
+            <CardDescription>{t('reports.utilizationRateDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={dailyMovements.slice(0, 6).map((d, i) => ({ name: dayLabels[i], checkedOut: d.checkedOut, checkedIn: d.checkedIn }))}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                  <Line type="monotone" dataKey="checkedOut" name="Checked Out" stroke={brandPrimary} strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="checkedIn" name="Checked In" stroke={brandLighter} strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-                </LineChart>
-              </ResponsiveContainer>
+              {utilizationData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-muted-foreground text-sm">{t('reports.noMovement')}</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={utilizationData} barCategoryGap="30%" barGap={4} margin={{ top: 4, right: 36, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.08)', fontSize: 12 }}
+                      cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                      formatter={(value: number, name: string) => {
+                        if (name === t('reports.netMovement')) return [value >= 0 ? `+${value}` : `${value}`, name];
+                        return [value, name];
+                      }}
+                    />
+                    <Legend iconType="square" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                    <Bar yAxisId="left" dataKey="checkedOut" name={t('reports.toolsCheckedOut')} fill={brandPrimary} radius={[4, 4, 0, 0]} />
+                    <Bar yAxisId="left" dataKey="checkedIn" name={t('reports.toolsReturned')} fill={brandReturn} radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="cumulativeOpen" name={t('reports.cumulativeOpen')}
+                      stroke="#f59e0b" strokeWidth={2} dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -723,13 +760,25 @@ export default function Reports() {
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={chartValues} nameKey="label" dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}>
+                  <Pie
+                    data={chartValues}
+                    nameKey="label"
+                    dataKey="value"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={90}
+                    paddingAngle={3}
+                  >
                     {chartValues.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
                     ))}
                   </Pie>
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  <RechartsTooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.08)', fontSize: 12 }}
+                    formatter={(value: number, name: string) => [value, name]}
+                  />
+                  <Legend iconType="square" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

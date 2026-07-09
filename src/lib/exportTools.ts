@@ -175,6 +175,8 @@ export function exportToolsToExcel({
         if (damagedQuantity > 0) { data.push(buildRow('Damaged', damagedQuantity, lastProjectForStatus('damaged'), guiaDeRemision)); hasExported = true; }
         if (lostQuantity > 0) { data.push(buildRow('Lost', lostQuantity, lastProjectForStatus('lost'), guiaDeRemision)); hasExported = true; }
         if (missingQuantity > 0) { data.push(buildRow('Missing', missingQuantity, lastProjectForStatus('missing'), guiaDeRemision)); hasExported = true; }
+        // Cal. Due: tool.status is the enriched value; quantity buckets don't cover this status
+        if (tool.status === 'Cal. Due') { data.push(buildRow('Cal. Due', tool.quantity || 1, '', '')); hasExported = true; }
         if (!hasExported && tool.quantity) data.push(buildRow(tool.status, tool.quantity, '', ''));
       } else {
         const qty =

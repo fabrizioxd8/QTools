@@ -82,7 +82,9 @@ interface InUseBadgeProps {
 export function InUseBadge({ toolId, assignments }: InUseBadgeProps) {
     const { t } = useTranslation();
     const entries = buildInUseEntries(toolId, assignments);
-    const inUseTotal = entries.filter(e => e.status === 'inUse').reduce((sum, e) => sum + e.qty, 0);
+    // Only show active in-use entries in this badge's tooltip
+    const inUseEntries = entries.filter(e => e.status === 'inUse');
+    const inUseTotal = inUseEntries.reduce((sum, e) => sum + e.qty, 0);
 
     return (
         <Tooltip>
@@ -95,25 +97,11 @@ export function InUseBadge({ toolId, assignments }: InUseBadgeProps) {
                 </span>
             </TooltipTrigger>
             <TooltipContent>
-                {entries.length > 0 ? (
+                {inUseEntries.length > 0 ? (
                     <div className="space-y-1">
-                        {entries.map((e, i) => {
-                            if (e.status === 'inUse') {
-                                return <div key={i} className="text-sm"><strong>{e.projectName}</strong>: {e.qty}</div>;
-                            }
-                            const labelKey = `tools.statusLabels.${e.status.charAt(0).toUpperCase() + e.status.slice(1)}`;
-                            const styleMap: Record<string, string> = {
-                                missing: 'text-yellow-400 font-semibold',
-                                damaged: 'text-red-400 font-semibold',
-                                lost: 'text-red-500 font-semibold',
-                            };
-                            return (
-                                <div key={i} className="text-sm">
-                                    <span className={styleMap[e.status]}>{t(labelKey)}</span>
-                                    {' — last seen: '}<strong>{e.projectName}</strong> ({e.qty})
-                                </div>
-                            );
-                        })}
+                        {inUseEntries.map((e, i) => (
+                            <div key={i} className="text-sm"><strong>{e.projectName}</strong>: {e.qty}</div>
+                        ))}
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">{t('tools.noAssignmentData')}</p>
@@ -193,8 +181,8 @@ export function ToolStatusBadges({ tool, assignments, statusFilter }: ToolStatus
             );
         }
 
-        // Missing only when not already covered by In Use badge
-        if ((tool.missingQuantity || 0) > 0 && !(tool.inUseQuantity || 0)) {
+        // Missing is always its own badge — separate from In Use
+        if ((tool.missingQuantity || 0) > 0) {
             const entry = completedEntries.find(e => e.status === 'missing');
             badges.push(
                 <Tooltip key="missing">

@@ -106,14 +106,32 @@ const enrichToolsWithAssignments = (toolsList: Tool[], asgs: Assignment[]) => {
     const totalOwned = tool.quantity || 1;
     const available = Math.max(0, totalOwned - inUse - damaged - lost - missing);
 
-    let correctStatus = tool.status;
-    if (tool.status === 'Cal. Due') {
-      correctStatus = 'Cal. Due'; // Preserve explicitly set Cal. Due state
-    } else if (available > 0) correctStatus = 'Available';
-    else if (inUse > 0) correctStatus = 'In Use';
-    else if (missing > 0) correctStatus = 'Missing';
-    else if (damaged > 0) correctStatus = 'Damaged';
-    else if (lost > 0) correctStatus = 'Lost';
+    // Determine correct status, checking calibration expiry before availability
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isCalibrationOverdue =
+      tool.isCalibrable &&
+      tool.calibrationDue &&
+      new Date(tool.calibrationDue) < today;
+
+    let correctStatus: Tool['status'];
+    if (isCalibrationOverdue) {
+      // Calibration overdue takes priority — tool is not usable regardless of qty
+      correctStatus = 'Cal. Due';
+    } else if (tool.status === 'Cal. Due') {
+      // Explicitly set Cal. Due (not yet expired by date, e.g. set manually) — preserve it
+      correctStatus = 'Cal. Due';
+    } else if (available > 0) {
+      correctStatus = 'Available';
+    } else if (inUse > 0) {
+      correctStatus = 'In Use';
+    } else if (missing > 0) {
+      correctStatus = 'Missing';
+    } else if (damaged > 0) {
+      correctStatus = 'Damaged';
+    } else {
+      correctStatus = 'Lost';
+    }
 
     // Auto-fix backend DB implicitly if a mismatched status overwrite is detected
     if (tool.status !== correctStatus) {
@@ -127,7 +145,8 @@ const enrichToolsWithAssignments = (toolsList: Tool[], asgs: Assignment[]) => {
       lostQuantity: lost,
       inUseQuantity: inUse,
       missingQuantity: missing,
-      availableQuantity: available
+      // Cal. Due tools are not available for use regardless of physical quantity
+      availableQuantity: correctStatus === 'Cal. Due' ? 0 : available,
     };
   });
 };
